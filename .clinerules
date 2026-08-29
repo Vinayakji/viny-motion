@@ -1,0 +1,97 @@
+# Genymotion APK Pentesting Pipeline — Cline Operating Rules
+
+This project is an **authorized mobile application security testing pipeline** that
+drives a Genymotion Android emulator through static analysis, dynamic
+instrumentation, traffic capture, storage extraction, and reporting.
+
+## Context for the agent
+
+- The **Genymotion MCP server** (`genymotion`, 40+ tools) is registered in Cline at
+  `~/.cline/data/settings/cline_mcp_settings.json`. It is backed by
+  `/home/user/genymotion/mcp_server.py` (FastMCP, stdio). Use its tools
+  (`full_static_analysis`, `full_dynamic_analysis`, `full_pentest`, SAST/DAST/
+  runtime/storage tools) for ad-hoc checks.
+- The **Burp MCP server** (`burp`, 56 tools) is also registered in Cline (same
+  settings file). It is backed by
+  `/home/user/Documents/burp-mcp/burp_unified_mcp.py` with env:
+  `BURP_SSE_URL=http://localhost:8181/mcp/sse`, `BURP_REST_URL=http://127.0.0.1:1337`,
+  `BURP_PROXY=http://127.0.0.1:8080`. The unified server merges 52 SSE (BurpMCP Jar)
+  tools + 4 REST tools; it gracefully falls back to REST-only (20+ tools) when the
+  Burp SSE endpoint isn't up. Use it for proxy/repeater/intruder/scanner, and for
+  replaying API endpoints found during traffic capture (see phase 06).
+- The **shell pipeline** in this directory performs an ordered, repeatable run and
+  writes artifacts under `reports/` and `findings/`.
+- Both paths complement each other: use MCP tools for interactive single-device
+  checks; use `./run.sh` for a full reproducible run / report.
+- **Authorized engagements only.** Never target an app without written scope.
+
+## Commands
+
+- Pre-flight / health check: `./run.sh check`
+- Run every phase end-to-end: `./run.sh all`
+- Run one phase: `./run.sh 01_static` (see `./run.sh list` for all)
+- Run selected phases: `./run.sh 00_acquire 02_setup_genymotion 04_dynamic_objection`
+- Add RAG knowledge dispatch per phase: `./run.sh --rag <phase...>`
+- Hand findings to the web VAPT pipeline: `./run.sh vapt_handoff`
+
+## Phase map (phases/*.sh)
+
+| # | Phase | Purpose |
+|---|-------|---------|
+| 00 | acquire | Download APK (Play Store / APKPure / APKMirror) or use local path |
+| 01 | static | jadx decompile, manifest audit, secrets, native libs |
+| 02 | setup_genymotion | Create/start Genymotion device, install APK |
+| 03 | dynamic_drozer | Drozer enumeration + exploitation |
+| 04 | dynamic_objection | Frida-based runtime hooking (SSL pin, root bypass, keychain) |
+| 05 | frida_hooks | Custom Frida scripts (tracing, memory, SSL bypass) |
+| 06 | traffic_capture | Burp proxy setup + API endpoint extraction |
+| 07 | deep_links | Intent / deep-link enumeration |
+| 08 | storage_dump | SharedPreferences, SQLite, files, keychain |
+| 09 | findings_report | Aggregate findings, generate report |
+
+## Configuration (config/target.yaml)
+
+The target config is gitignored (contains credentials). Create it before running.
+Required keys:
+
+```yaml
+apk:
+  path: "/path/to/app.apk"          # local APK, OR
+  package_name: "com.example.app"
+  download_url: ""                  # remote source
+genymotion:
+  device_name: "pipeline-test"      # existing or to-create device
+  android_version: "11.0"
+  resolution: "1080x1920"
+  memory: 4096
+proxy:
+  host: "127.0.0.1"
+  port: 8080                        # Burp proxy
+frida:
+  ssl_bypass: true
+  root_bypass: true
+  hook_classes: []
+auth:
+  jwt: ""
+  headers: {}
+```
+
+## Usage flow for a target
+
+1. Confirm authorization/scope for the target app.
+2. Ensure the Genymotion device is available (`~/genymotion/gmtool list` or start it).
+3. Create/update `config/target.yaml` for the target (set `apk.path`,
+   `apk.package_name`, `genymotion.device_name`).
+4. `./run.sh check` to validate config + tools.
+5. `./run.sh all` for the full run, or run specific phases incrementally.
+6. Review `reports/run_<ts>/` and `findings/findings.json`.
+
+## Environment notes discovered
+
+- Tooling present: adb, drozer, objection, frida, frida-ps, frida-trace, jq,
+  Genymotion at `~/genymotion`.
+- `jadx` was NOT on PATH during setup — use the MCP static-analysis fallback
+  (line `JADX = shutil.which("jadx") or "/tmp/jadx/bin/jadx"`) or install it
+  (`apt install jadx`) before the static phase if needed.
+- Before running the pipeline, verify `gmtool`/adb can see the running device:
+  `~/genymotion/gmtool list` and `adb devices`.

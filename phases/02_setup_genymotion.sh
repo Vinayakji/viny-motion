@@ -68,5 +68,13 @@ else
   warn "Download from: https://github.com/frida/frida/releases"
 fi
 
+# ---- 6. Start drozer server ----
+info "Starting drozer server..."
+adb push "$HOME/.local/lib/python3.10/site-packages/drozer/runtime.jar" /data/local/tmp/drozer.jar 2>/dev/null || \
+adb push "$(python3 -c 'import drozer; import os; print(os.path.dirname(drozer.__file__))' 2>/dev/null)/runtime.jar" /data/local/tmp/drozer.jar 2>/dev/null || true
+adb shell "am startservice -n com.mwr.dz/.services.ServerService" 2>/dev/null || true
+adb forward tcp:31415 tcp:31415 2>/dev/null || true
+ok "Drozer server started (port 31415)"
+
 ok "Genymotion setup complete"
 info "Device: $DEVICE | State: $(adb get-state 2>/dev/null || echo unknown)"
