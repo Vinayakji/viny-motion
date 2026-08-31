@@ -28,8 +28,11 @@ export REUSE_RUN_DIR="$RUN_DIR"
 
 PHASES=(
   00_acquire 01_static 02_setup_genymotion
-  03_dynamic_drozer 04_dynamic_objection 05_frida_hooks
-  06_traffic_capture 07_deep_links 08_storage_dump 09_findings_report
+  03_dynamic_drozer 03b_dynamic_drozer_mcp 04_dynamic_objection
+  05_frida_hooks 06_traffic_capture 07_deep_links 07_storage_dump
+  09_mobsf_dast 10_backup_extract 11_webview_exploit
+  12_pending_intent 13_resilience 14_crypto_audit 15_cleanup
+  08_findings_report
 )
 
 run_one() {

@@ -76,5 +76,30 @@ adb shell "am startservice -n com.mwr.dz/.services.ServerService" 2>/dev/null ||
 adb forward tcp:31415 tcp:31415 2>/dev/null || true
 ok "Drozer server started (port 31415)"
 
+# ---- 7. Verify root access ----
+info "Verifying root access..."
+ROOT_UID=$(adb shell "id -u" 2>/dev/null || echo "unknown")
+if [ "$ROOT_UID" = "0" ]; then
+  ok "Root access confirmed (uid=0)"
+  adb shell "su -c 'echo root_ok'" 2>/dev/null | grep -q "root_ok" && \
+    ok "su binary working" || warn "su binary not working"
+else
+  warn "No root access (uid=$ROOT_UID) - some tests will be limited"
+  warn "Genymotion devices are usually pre-rooted; check Settings > About"
+fi
+
+# ---- 8. Check MobSF ----
+info "Checking MobSF..."
+if curl -s http://127.0.0.1:8000/api/v1/upload > /dev/null 2>&1; then
+  ok "MobSF running on :8000"
+elif [ -d "$HOME/tools/MobSF" ]; then
+  info "Starting MobSF..."
+  cd "$HOME/tools/MobSF" && nohup python3 manage.py runserver 8000 &>/dev/null &
+  sleep 3
+  curl -s http://127.0.0.1:8000/api/v1/upload > /dev/null 2>&1 && ok "MobSF started" || warn "MobSF failed to start"
+else
+  warn "MobSF not found (optional - install from https://github.com/MobSF/Mobile-Security-Framework-MobSF)"
+fi
+
 ok "Genymotion setup complete"
 info "Device: $DEVICE | State: $(adb get-state 2>/dev/null || echo unknown)"
