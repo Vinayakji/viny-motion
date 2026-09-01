@@ -1,0 +1,292 @@
+{
+  "detector_catalog": {
+    "version": "1.0.0",
+    "description": "Runtime Application Self-Protection (RASP) detector catalog for Android apps",
+    "last_updated": "2026-09-01",
+    "detectors": [
+      {
+        "id": "RASP-001",
+        "name": "Root Detection",
+        "category": "device_integrity",
+        "owasp": "M1",
+        "cwe": "CWE-284",
+        "severity": "INFO",
+        "description": "Checks if device is rooted via su binary, SuperSU, Magisk, KernelSU",
+        "detection_methods": [
+          { "type": "static", "pattern": "isRooted|isDeviceRooted|checkRoot|RootBeer|/system/app/Superuser|/system/bin/su|/system/xbin/su" },
+          { "type": "static", "pattern": "com.noshufou.android.su|com.thirdparty.superuser|eu.chainfire.supersu|com.koushikdutta.superuser" },
+          { "type": "dynamic", "method": "frida_root_detection" },
+          { "type": "dynamic", "method": "objection_root_detection" }
+        ],
+        "bypass_vectors": ["Frida root bypass", "Hide My Magisk", "Zygisk", "KernelSU denylist"],
+        "frida_scripts": ["root-bypass.js", "rootkit-detector.js"]
+      },
+      {
+        "id": "RASP-002",
+        "name": "Emulator Detection",
+        "category": "device_integrity",
+        "owasp": "M1",
+        "cwe": "CWE-284",
+        "severity": "INFO",
+        "description": "Detects Android emulators (AVD, Genymotion, BlueStacks, LDPlayer)",
+        "detection_methods": [
+          { "type": "static", "pattern": "goldfish|generic|sdk_gphone|emulator|Genymotion|/dev/socket/qemud|/dev/qemu_pipe|10.0.2.15" },
+          { "type": "static", "pattern": "build.goldfish|android.product.model|X86|generic_x86|ro.hardware|ro.product.model" },
+          { "type": "dynamic", "method": "build_properties_spoof" },
+          { "type": "dynamic", "method": "sensor_check" }
+        ],
+        "bypass_vectors": ["Build property spoofing", "Sensor emulation", "Frida property hooks"],
+        "frida_scripts": ["emulator-detection-bypass.js"]
+      },
+      {
+        "id": "RASP-003",
+        "name": "Anti-Debug Detection",
+        "category": "anti_analysis",
+        "owasp": "M1",
+        "cwe": "CWE-388",
+        "severity": "INFO",
+        "description": "Detects debugger attachment via TracerPid, timing checks, Debug API",
+        "detection_methods": [
+          { "type": "static", "pattern": "isDebuggerConnected|Debug.isDebugger|ptrace|TracerPid|PTRACE_TRACEME" },
+          { "type": "static", "pattern": "/proc/self/status|timing.*check|System.nanoTime|Debug.waitForDebugger" },
+          { "type": "dynamic", "method": "timing_check" },
+          { "type": "dynamic", "method": "tracerpid_check" }
+        ],
+        "bypass_vectors": ["Frida anti-debug bypass", "TracerPid patching", "Timing normalization"],
+        "frida_scripts": ["anti-debug.js"]
+      },
+      {
+        "id": "RASP-004",
+        "name": "Frida Detection",
+        "category": "anti_analysis",
+        "owasp": "M1",
+        "cwe": "CWE-388",
+        "severity": "INFO",
+        "description": "Detects Frida framework via port scanning, memory patterns, named pipes",
+        "detection_methods": [
+          { "type": "static", "pattern": "frida|gadget|REJECT|LIBFRIDA" },
+          { "type": "dynamic", "method": "port_scan_27042" },
+          { "type": "dynamic", "method": "memory_pattern_scan" },
+          { "type": "dynamic", "method": "named_pipe_check" }
+        ],
+        "bypass_vectors": ["Frida server renaming", "Custom Frida builds", "frida-server on non-standard port"],
+        "frida_scripts": ["android-anti-frida-countermeasures.js"]
+      },
+      {
+        "id": "RASP-005",
+        "name": "Integrity/Tamper Check",
+        "category": "app_integrity",
+        "owasp": "M1",
+        "cwe": "CWE-353",
+        "severity": "INFO",
+        "description": "Verifies APK signature, installation source, and code integrity",
+        "detection_methods": [
+          { "type": "static", "pattern": "PackageManager.getPackageInfo.*GET_SIGNATURES|PackageManager.GET_SIGNING_CERTIFICATES" },
+          { "type": "static", "pattern": "signature.*check|integrity.*check|hash.*check|tamper" },
+          { "type": "dynamic", "method": "signature_verification" },
+          { "type": "dynamic", "method": "hash_verification" }
+        ],
+        "bypass_vectors": ["Re-sign APK with debug key", "Hook PackageManager", "Modify signature check logic"],
+        "frida_scripts": ["test-universal-script.js"]
+      },
+      {
+        "id": "RASP-006",
+        "name": "SSL Pinning",
+        "category": "network_security",
+        "owasp": "M3",
+        "cwe": "CWE-295",
+        "severity": "INFO",
+        "description": "Certificate pinning for network traffic interception prevention",
+        "detection_methods": [
+          { "type": "static", "pattern": "CertificatePinner|TrustManager|checkServerTrusted|PinningTrustManager" },
+          { "type": "static", "pattern": "network_security_config|pin-set|domain-config" },
+          { "type": "dynamic", "method": "ssl_pinning_test" }
+        ],
+        "bypass_vectors": ["Frida SSL pinning bypass", "objection sslpinning disable", "JustTrustMe module", "TrustMeAlready"],
+        "frida_scripts": ["ssl-bypass.js", "tls-interceptor.js", "network-security-bypass.js"]
+      },
+      {
+        "id": "RASP-007",
+        "name": "Biometric Authentication",
+        "category": "authentication",
+        "owasp": "M4",
+        "cwe": "CWE-287",
+        "severity": "INFO",
+        "description": "Biometric prompt and fingerprint manager authentication",
+        "detection_methods": [
+          { "type": "static", "pattern": "BiometricPrompt|FingerprintManager|authenticate|cryptoObject" },
+          { "type": "dynamic", "method": "biometric_callback_hook" }
+        ],
+        "bypass_vectors": ["Frida biometric bypass", "Force biometric success", "Bypass biometric check entirely"],
+        "frida_scripts": ["biometric-bypass.js"]
+      },
+      {
+        "id": "RASP-008",
+        "name": "Device Lock/Keyguard",
+        "category": "authentication",
+        "owasp": "M4",
+        "cwe": "CWE-287",
+        "severity": "INFO",
+        "description": "Device lock screen and keyguard manager checks",
+        "detection_methods": [
+          { "type": "static", "pattern": "KeyguardManager|isDeviceLocked|isKeyguardSecure|DevicePolicyManager|LOCK_SCREEN" },
+          { "type": "dynamic", "method": "keyguard_bypass" }
+        ],
+        "bypass_vectors": ["Frida keyguard bypass", "Window flag manipulation", "Activity lock bypass"],
+        "frida_scripts": ["device-lock-bypass.js"]
+      },
+      {
+        "id": "RASP-009",
+        "name": "Obfuscation Detection",
+        "category": "anti_analysis",
+        "owasp": "M1",
+        "cwe": "CWE-95",
+        "severity": "INFO",
+        "description": "Code obfuscation via ProGuard/R8, DexGuard, string encryption",
+        "detection_methods": [
+          { "type": "static", "pattern": "[a-z]{1,2}\\.[a-z]{1,2}\\.[a-z]{1,2}\\." },
+          { "type": "static", "pattern": "ProGuard|R8|DexGuard|Zelix" }
+        ],
+        "bypass_vectors": ["ReTrace mapping", "String deobfuscation", "DexGuard unpacking"],
+        "frida_scripts": ["class-loader-analyzer.js"]
+      },
+      {
+        "id": "RASP-010",
+        "name": "Dynamic Code Loading",
+        "category": "anti_analysis",
+        "owasp": "M1",
+        "cwe": "CWE-94",
+        "severity": "INFO",
+        "description": "Runtime DEX loading, reflection, and code execution from external sources",
+        "detection_methods": [
+          { "type": "static", "pattern": "DexClassLoader|PathClassLoader|InMemoryDexClassLoader|loadClass" },
+          { "type": "static", "pattern": "Method.invoke|getDeclaredMethod|Class.forName|DexFile.loadDex" },
+          { "type": "dynamic", "method": "class_loader_monitor" }
+        ],
+        "bypass_vectors": ["Dump loaded DEX", "Hook class loading", "Memory scan for loaded classes"],
+        "frida_scripts": ["dynamic-loading-analyzer.js", "class-loader-analyzer.js"]
+      },
+      {
+        "id": "RASP-011",
+        "name": "Jailbreak Detection",
+        "category": "device_integrity",
+        "owasp": "M1",
+        "cwe": "CWE-284",
+        "severity": "INFO",
+        "description": "iOS jailbreak detection (for cross-platform apps)",
+        "detection_methods": [
+          { "type": "static", "pattern": "jailbreak|Cydia|AppSync|substrate|SSLKillSwitch" },
+          { "type": "dynamic", "method": "file_existence_check" }
+        ],
+        "bypass_vectors": ["Hook file existence checks", "Bypass Cydia detection"],
+        "frida_scripts": []
+      },
+      {
+        "id": "RASP-012",
+        "name": "Xposed/Magisk Detection",
+        "category": "anti_analysis",
+        "owasp": "M1",
+        "cwe": "CWE-388",
+        "severity": "INFO",
+        "description": "Detects Xposed Framework and Magisk modules",
+        "detection_methods": [
+          { "type": "static", "pattern": "xposed|magisk|substrate|dalvik\\.system\\.XposedBridge" },
+          { "type": "dynamic", "method": "module_detection" }
+        ],
+        "bypass_vectors": ["LSPosed", "Zygisk", "HideMyApplist"],
+        "frida_scripts": ["rootkit-detector.js"]
+      },
+      {
+        "id": "RASP-013",
+        "name": "Cloning/Tampering Detection",
+        "category": "app_integrity",
+        "owasp": "M1",
+        "cwe": "CWE-353",
+        "severity": "INFO",
+        "description": "Detects app cloning, repackaging, and binary modification",
+        "detection_methods": [
+          { "type": "static", "pattern": "Installer.*INSTALL_PACKAGE|PackageInstaller|getInstallSourceInfo" },
+          { "type": "static", "pattern": "firstInstallTime|lastUpdateTime|INSTALL_SOURCE_UNKNOWN" }
+        ],
+        "bypass_vectors": ["Hook PackageManager", "Spoof install source", "Re-sign APK"],
+        "frida_scripts": ["test-universal-script.js"]
+      },
+      {
+        "id": "RASP-014",
+        "name": "Network Proxy Detection",
+        "category": "network_security",
+        "owasp": "M3",
+        "cwe": "CWE-295",
+        "severity": "INFO",
+        "description": "Detects proxy configuration and MITM interception",
+        "detection_methods": [
+          { "type": "static", "pattern": "ProxySelector|proxyHost|HTTP_PROXY|http_proxy|SSLProxy" },
+          { "type": "dynamic", "method": "proxy_check" }
+        ],
+        "bypass_vectors": ["FoxyProxy with Burp", "Transparent proxy", "VPN interception"],
+        "frida_scripts": ["network-interceptor-enhanced.js"]
+      },
+      {
+        "id": "RASP-015",
+        "name": "SQLCipher Detection",
+        "category": "data_protection",
+        "owasp": "M2",
+        "cwe": "CWE-312",
+        "severity": "INFO",
+        "description": "Encrypted SQLite database detection and key management",
+        "detection_methods": [
+          { "type": "static", "pattern": "SQLCipher|net\\.zetetic|Passphrase|sqlcipher" },
+          { "type": "dynamic", "method": "database_open_monitor" }
+        ],
+        "bypass_vectors": ["Dump database file", "Hook SQLCipher key derivation", "Memory dump for keys"],
+        "frida_scripts": ["sqlite-dumper.js", "encryption-at-rest-checker.js"]
+      },
+      {
+        "id": "RASP-016",
+        "name": "WebView Security",
+        "category": "web_security",
+        "owasp": "M7",
+        "cwe": "CWE-610",
+        "severity": "INFO",
+        "description": "WebView JavaScript bridge and file access configuration",
+        "detection_methods": [
+          { "type": "static", "pattern": "addJavascriptInterface|setJavaScriptEnabled|setAllowFileAccess|WebView" },
+          { "type": "dynamic", "method": "webview_javascript_hook" }
+        ],
+        "bypass_vectors": ["Hook JavaScript bridge", "Modify WebView settings", "XSS via WebView"],
+        "frida_scripts": ["webview-debug.js", "webview-hook.js"]
+      },
+      {
+        "id": "RASP-017",
+        "name": "Clipboard Monitoring",
+        "category": "data_protection",
+        "owasp": "M2",
+        "cwe": "CWE-316",
+        "severity": "INFO",
+        "description": "Clipboard access and sensitive data in clipboard",
+        "detection_methods": [
+          { "type": "static", "pattern": "ClipboardManager|setPrimaryClip|getPrimaryClip|clipboard" },
+          { "type": "dynamic", "method": "clipboard_hook" }
+        ],
+        "bypass_vectors": ["Hook ClipboardManager", "Monitor clipboard contents", "Auto-clear clipboard"],
+        "frida_scripts": ["clipboard-monitor.js"]
+      },
+      {
+        "id": "RASP-018",
+        "name": "Log Injection/Sanitization",
+        "category": "logging",
+        "owasp": "M9",
+        "cwe": "CWE-532",
+        "severity": "INFO",
+        "description": "Logging of sensitive data and log injection vulnerabilities",
+        "detection_methods": [
+          { "type": "static", "pattern": "Log\\.d|Log\\.v|Log\\.i|Log\\.w|Log\\.e" },
+          { "type": "static", "pattern": "LogLevel\\.ALL|LogLevel\\.BODY|LogLevel\\.HEADERS" },
+          { "type": "dynamic", "method": "log_monitor" }
+        ],
+        "bypass_vectors": ["Monitor logcat output", "Hook logging functions", "Log injection via newline chars"],
+        "frida_scripts": ["logging-interceptor.js"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+apk:
+  path: /path/to/app.apk
+  package_name: com.example.app
+  version: "4.28"
+  version_code: "128"
+
+genymotion:
+  device_name: "127.0.0.1:6555"
+  android_version: "16"
+
+proxy:
+  host: 127.0.0.1
+  port: 8080
+
+auth:
+  headers:
+    X-Device-Id: "REDACTED_DEVICE_ID"
+    X-User-Id: "REDACTED_USER_ID"
+    X-Center-Code: "REDACTED_CENTER_CODE"
+
+frida:
+  server_version: "16.2.1"
+  hook_classes: []
+
+output:
+  base_dir: /tmp/genymotion_runs

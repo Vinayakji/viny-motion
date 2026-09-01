@@ -1,0 +1,214 @@
+{
+  "bypass_profiles": {
+    "version": "1.0.0",
+    "description": "RASP bypass profiles — method → detection → technique mapping",
+    "last_updated": "2026-09-01",
+    "profiles": [
+      {
+        "name": "root_detection_bypass",
+        "target": "RASP-001",
+        "techniques": [
+          {
+            "id": "BYP-001",
+            "method": "frida_hook",
+            "description": "Hook su binary checks, file existence, RootBeer library",
+            "script": "root-bypass.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          },
+          {
+            "id": "BYP-002",
+            "method": "magisk_denylist",
+            "description": "Hide Magisk from target app using Zygisk denylist",
+            "effectiveness": "high",
+            "stealth": "high"
+          },
+          {
+            "id": "BYP-003",
+            "method": "kernel_level_hide",
+            "description": "Kernel-level root hiding (KernelSU modules)",
+            "effectiveness": "very_high",
+            "stealth": "very_high"
+          }
+        ]
+      },
+      {
+        "name": "emulator_detection_bypass",
+        "target": "RASP-002",
+        "techniques": [
+          {
+            "id": "BYP-004",
+            "method": "build_property_spoof",
+            "description": "Override Build.MODEL, Build.MANUFACTURER, etc.",
+            "script": "emulator-detection-bypass.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          },
+          {
+            "id": "BYP-005",
+            "method": "sensor_emulation",
+            "description": "Provide fake accelerometer/gyroscope data",
+            "effectiveness": "medium",
+            "stealth": "high"
+          },
+          {
+            "id": "BYP-006",
+            "method": "file_property_mask",
+            "description": "Block file existence checks (/dev/qemu_pipe, etc.)",
+            "script": "emulator-detection-bypass.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          }
+        ]
+      },
+      {
+        "name": "anti_debug_bypass",
+        "target": "RASP-003",
+        "techniques": [
+          {
+            "id": "BYP-007",
+            "method": "frida_anti_debug",
+            "description": "Hook isDebuggerConnected, TracerPid, timing checks",
+            "script": "anti-debug.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          },
+          {
+            "id": "BYP-008",
+            "method": "ptrace_self",
+            "description": "Self-ptrace to prevent external debugger attachment",
+            "effectiveness": "medium",
+            "stealth": "low"
+          },
+          {
+            "id": "BYP-009",
+            "method": "timing_normalization",
+            "description": "Normalize timing checks to prevent detection",
+            "effectiveness": "high",
+            "stealth": "high"
+          }
+        ]
+      },
+      {
+        "name": "frida_detection_bypass",
+        "target": "RASP-004",
+        "techniques": [
+          {
+            "id": "BYP-010",
+            "method": "frida_rename",
+            "description": "Rename frida-server binary and change default port",
+            "effectiveness": "medium",
+            "stealth": "medium"
+          },
+          {
+            "id": "BYP-011",
+            "method": "frida_server_custom_build",
+            "description": "Custom Frida server build with modified signatures",
+            "effectiveness": "high",
+            "stealth": "high"
+          },
+          {
+            "id": "BYP-012",
+            "method": "frida_port_redirect",
+            "description": "Run Frida on non-standard port to avoid port scanning",
+            "effectiveness": "medium",
+            "stealth": "medium"
+          }
+        ]
+      },
+      {
+        "name": "ssl_pinning_bypass",
+        "target": "RASP-006",
+        "techniques": [
+          {
+            "id": "BYP-013",
+            "method": "frida_ssl_unpin",
+            "description": "Hook TrustManager and CertificatePinner",
+            "script": "ssl-bypass.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          },
+          {
+            "id": "BYP-014",
+            "method": "objection_sslpinning",
+            "description": "Use objection to disable SSL pinning",
+            "effectiveness": "high",
+            "stealth": "low"
+          },
+          {
+            "id": "BYP-015",
+            "method": "network_security_config_modify",
+            "description": "Modify network_security_config.xml at runtime",
+            "effectiveness": "high",
+            "stealth": "high"
+          }
+        ]
+      },
+      {
+        "name": "biometric_bypass",
+        "target": "RASP-007",
+        "techniques": [
+          {
+            "id": "BYP-016",
+            "method": "frida_biometric_force",
+            "description": "Hook BiometricPrompt to always return success",
+            "script": "biometric-bypass.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          },
+          {
+            "id": "BYP-017",
+            "method": "keyguard_bypass",
+            "description": "Bypass KeyguardManager checks via window flags",
+            "script": "device-lock-bypass.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          }
+        ]
+      },
+      {
+        "name": "dynamic_loading_bypass",
+        "target": "RASP-010",
+        "techniques": [
+          {
+            "id": "BYP-018",
+            "method": "dex_dump",
+            "description": "Dump dynamically loaded DEX files from memory",
+            "script": "dynamic-loading-analyzer.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          },
+          {
+            "id": "BYP-019",
+            "method": "class_load_monitor",
+            "description": "Monitor ClassLoader.loadClass for loaded classes",
+            "script": "class-loader-analyzer.js",
+            "effectiveness": "high",
+            "stealth": "medium"
+          }
+        ]
+      },
+      {
+        "name": "obfuscation_bypass",
+        "target": "RASP-009",
+        "techniques": [
+          {
+            "id": "BYP-020",
+            "method": "runtime_deobfuscation",
+            "description": "Hook Class.forName to resolve obfuscated class names",
+            "script": "class-loader-analyzer.js",
+            "effectiveness": "high",
+            "stealth": "high"
+          },
+          {
+            "id": "BYP-021",
+            "method": "string_deobfuscation",
+            "description": "Hook String decryption methods at runtime",
+            "effectiveness": "high",
+            "stealth": "high"
+          }
+        ]
+      }
+    ]
+  }
+}

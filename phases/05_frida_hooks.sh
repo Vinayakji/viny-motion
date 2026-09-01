@@ -16,11 +16,13 @@ mkdir -p "$FRIDA_DIR"
 
 # Check frida
 command -v frida >/dev/null 2>&1 || { warn "frida not installed (pip install frida-tools)"; exit 0; }
+info "Frida version: $(frida --version 2>/dev/null || echo 'unknown')"
 
 # ---- 1. Generate Frida scripts ----
-info "Generating Frida scripts..."
+info "[step-1/4] Generating Frida instrumentation scripts"
 
 # SSL Pinning Bypass script
+info "  [script-1/4] ssl_bypass.js — hooks TrustManagerImpl.verifyChain + TrustManager.checkServerTrusted"
 cat > "$FRIDA_DIR/ssl_bypass.js" <<'EOF'
 Java.perform(function() {
     var TrustManagerImpl = Java.use('com.android.org.conscrypt.TrustManagerImpl');
@@ -49,8 +51,10 @@ Java.perform(function() {
     console.log('[+] SSL Pinning Bypassed');
 });
 EOF
+info "    Written to $FRIDA_DIR/ssl_bypass.js"
 
 # Method Tracer script
+info "  [script-2/4] method_tracer.js — enumerates classes matching login|auth|token|password"
 cat > "$FRIDA_DIR/method_tracer.js" <<'EOF'
 Java.perform(function() {
     var classes = Java.enumerateLoadedClassesSync();
@@ -69,8 +73,10 @@ Java.perform(function() {
     });
 });
 EOF
+info "    Written to $FRIDA_DIR/method_tracer.js"
 
 # Memory Search script
+info "  [script-3/4] memory_search.js — enumerates loaded classes matching sensitive patterns"
 cat > "$FRIDA_DIR/memory_search.js" <<'EOF'
 Java.perform(function() {
     var patterns = ['password', 'secret', 'token', 'api_key', 'apikey', 'auth'];
@@ -87,8 +93,10 @@ Java.perform(function() {
     });
 });
 EOF
+info "    Written to $FRIDA_DIR/memory_search.js"
 
 # Network Interception script
+info "  [script-4/4] network_intercept.js — hooks java.net.URL and HttpURLConnection"
 cat > "$FRIDA_DIR/network_intercept.js" <<'EOF'
 Java.perform(function() {
     var URL = Java.use('java.net.URL');
@@ -105,35 +113,55 @@ Java.perform(function() {
     };
 });
 EOF
+info "    Written to $FRIDA_DIR/network_intercept.js"
 
-ok "Frida scripts generated"
+ok "  All 4 Frida scripts generated"
 
 # ---- 2. Run SSL bypass ----
-info "Running SSL bypass..."
+info "[step-2/4] Executing SSL Pinning Bypass"
+info "  Command: frida -U -f $PKG -l $FRIDA_DIR/ssl_bypass.js --no-pause"
+info "  Capture: $FRIDA_DIR/ssl_output.txt"
+info "  Duration: 10s"
 frida -U -f "$PKG" -l "$FRIDA_DIR/ssl_bypass.js" --no-pause > "$FRIDA_DIR/ssl_output.txt" 2>&1 &
 FRIDA_PID=$!
+info "  Frida PID: $FRIDA_PID"
 sleep 10
 kill $FRIDA_PID 2>/dev/null || true
+info "  Process terminated"
 
 if grep -q "SSL Pinning Bypassed" "$FRIDA_DIR/ssl_output.txt" 2>/dev/null; then
-  ok "SSL bypass script executed"
+  ok "  SSL bypass script executed successfully"
   fadd "SSL pinning bypass (Frida)" MEDIUM MEDIUM CWE-295 "A02:2021" "$FRIDA_DIR/ssl_output.txt"
 else
-  warn "SSL bypass may have failed"
+  warn "  SSL bypass may have failed (no success marker in output)"
 fi
 
 # ---- 3. Run method tracer ----
-info "Running method tracer..."
+info "[step-3/4] Executing Method Tracer"
+info "  Command: frida -U -f $PKG -l $FRIDA_DIR/method_tracer.js --no-pause"
+info "  Capture: $FRIDA_DIR/tracer_output.txt"
+info "  Duration: 10s"
 frida -U -f "$PKG" -l "$FRIDA_DIR/method_tracer.js" --no-pause > "$FRIDA_DIR/tracer_output.txt" 2>&1 &
 FRIDA_PID=$!
+info "  Frida PID: $FRIDA_PID"
 sleep 10
 kill $FRIDA_PID 2>/dev/null || true
+info "  Process terminated"
 
 if grep -q "Found:" "$FRIDA_DIR/tracer_output.txt" 2>/dev/null; then
   SENSITIVE_CLASSES=$(grep -c "Found:" "$FRIDA_DIR/tracer_output.txt")
-  warn "$SENSITIVE_CLASSES sensitive classes found"
+  warn "  $SENSITIVE_CLASSES sensitive classes discovered by tracer"
   fadd "Sensitive classes found (Frida tracer)" LOW CERTAIN CWE-532 "A09:2021" "$FRIDA_DIR/tracer_output.txt"
+else
+  info "  No sensitive classes matched by tracer"
 fi
+
+# ---- 4. Summary ----
+info "[step-4/4] Frida hook results summary"
+SSL_LINES=$(wc -l < "$FRIDA_DIR/ssl_output.txt" 2>/dev/null || echo 0)
+TRACER_LINES=$(wc -l < "$FRIDA_DIR/tracer_output.txt" 2>/dev/null || echo 0)
+info "  ssl_output.txt: $SSL_LINES lines"
+info "  tracer_output.txt: $TRACER_LINES lines"
 
 ok "Frida hooks complete -> $FRIDA_DIR"
 fsnapshot

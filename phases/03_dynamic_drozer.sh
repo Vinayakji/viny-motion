@@ -22,327 +22,339 @@ drozer_cmd() {
 }
 
 # ---- 1. Start drozer + port forward ----
-info "Starting drozer server + port forward..."
+info "[step-1/10] Starting drozer server and establishing port forward"
+info "  Starting ServerService on device..."
 adb shell "am startservice -n com.mwr.dz/.services.ServerService" 2>/dev/null || true
+info "  Setting up ADB port forward: tcp:31415 -> tcp:31415"
 adb forward tcp:31415 tcp:31415 2>/dev/null
+info "  Waiting 2s for drozer server to initialize..."
 sleep 2
+ok "  Drozer server ready on port 31415"
 
 # ---- 2. List all modules ----
+info "[step-2/10] Listing all available drozer modules"
 drozer_cmd "$DROZER_DIR/all_modules.txt" "list"
+MODULE_COUNT=$(wc -l < "$DROZER_DIR/all_modules.txt" 2>/dev/null || echo 0)
+info "  Available modules: $MODULE_COUNT"
 
 # ============================================================
 # A. PACKAGE INFO (all flags)
 # ============================================================
-info "=== A. Package Enumeration ==="
+info "[step-3/10] === A. Package Enumeration ==="
 
-# -a = package alias
+info "  [A1] Gathering package info (app.package.info -a $PKG)"
 drozer_cmd "$DROZER_DIR/A1_package_info.txt" \
   "run app.package.info -a $PKG"
 
-# Get installation path
+info "  [A2] Getting APK installation path (app.package.path)"
 drozer_cmd "$DROZER_DIR/A2_package_path.txt" \
   "run app.package.path -a $PKG"
 
-# Get UID
+info "  [A3] Getting application UID (app.package.uid)"
 drozer_cmd "$DROZER_DIR/A3_package_uid.txt" \
   "run app.package.uid -a $PKG"
 
-# Attack surface summary (lists all exported components in one shot)
+info "  [A4] Mapping attack surface (app.package.attacksurface)"
 drozer_cmd "$DROZER_DIR/A4_attack_surface.txt" \
   "run app.package.attacksurface $PKG"
 
-# Manifest
+info "  [A5] Extracting full manifest (app.package.manifest)"
 drozer_cmd "$DROZER_DIR/A5_manifest.txt" \
   "run app.package.manifest $PKG"
 
-# Certificate
+info "  [A6] Extracting signing certificate (app.package.certificate)"
 drozer_cmd "$DROZER_DIR/A6_certificate.txt" \
   "run app.package.certificate $PKG"
 
-# Debuggable
+info "  [A7] Checking debuggable flag (app.package.debuggable)"
 drozer_cmd "$DROZER_DIR/A7_debuggable.txt" \
   "run app.package.debuggable $PKG"
 
-# Backup
+info "  [A8] Checking backup flag (app.package.backup)"
 drozer_cmd "$DROZER_DIR/A8_backup.txt" \
   "run app.package.backup $PKG"
 
-ok "Package enumeration complete"
+ok "  Package enumeration complete (8 commands)"
 
 # ============================================================
 # B. ACTIVITIES (all flags)
 # ============================================================
-info "=== B. Activities ==="
+info "[step-4/10] === B. Activity Enumeration ==="
 
-# -a = package
+info "  [B1] Listing all activities (app.activity.info -a $PKG)"
 drozer_cmd "$DROZER_DIR/B1_activities.txt" \
   "run app.activity.info -a $PKG"
 
-# Find all attackable activities
+info "  [B2] Finding sendable activities (app.activity.send)"
 drozer_cmd "$DROZER_DIR/B2_activities_send.txt" \
   "run app.activity.send -a $PKG"
 
-ok "Activities complete"
+ok "  Activities complete (2 commands)"
 
 # ============================================================
 # C. SERVICES (all flags)
 # ============================================================
-info "=== C. Services ==="
+info "[step-5/10] === C. Service Enumeration ==="
 
-# -a = package
+info "  [C1] Listing all services (app.service.info -a $PKG)"
 drozer_cmd "$DROZER_DIR/C1_services.txt" \
   "run app.service.info -a $PKG"
 
-ok "Services complete"
+ok "  Services complete (1 command)"
 
 # ============================================================
 # D. CONTENT PROVIDERS (all flags)
 # ============================================================
-info "=== D. Content Providers ==="
+info "[step-6/10] === D. Content Provider Enumeration & Testing ==="
 
-# -a = package
+info "  [D1] Listing content providers (app.provider.info -a $PKG)"
 drozer_cmd "$DROZER_DIR/D1_providers.txt" \
   "run app.provider.info -a $PKG"
 
-# Find provider URIs
+info "  [D2] Finding provider URIs (app.provider.find -a $PKG)"
 drozer_cmd "$DROZER_DIR/D2_provider_find.txt" \
   "run app.provider.find -a $PKG"
 
-# Query root URI with flags:
-#   --projection (-p) = specific columns
-#   --where (-w) = SQL WHERE clause
-#   --sort = ORDER BY
-#   --vertical (-v) = vertical display
+info "  [D3] Querying root URI with vertical display"
 drozer_cmd "$DROZER_DIR/D3_provider_root_query.txt" \
   "run app.provider.query content://$PKG/ --vertical"
 
-# Query with projection
+info "  [D4] Querying with projection (_id column only)"
 drozer_cmd "$DROZER_DIR/D4_provider_projection.txt" \
   "run app.provider.query content://$PKG/ --projection _id --vertical"
 
-# Query with WHERE
+info "  [D5] Querying with WHERE clause (1=1)"
 drozer_cmd "$DROZER_DIR/D5_provider_where.txt" \
   "run app.provider.query content://$PKG/ --where '_id=1' --vertical"
 
-# Query with sort
+info "  [D6] Querying with SORT order (_id DESC)"
 drozer_cmd "$DROZER_DIR/D6_provider_sort.txt" \
   "run app.provider.query content://$PKG/ --sort '_id DESC' --vertical"
 
-# Read file via provider
+info "  [D7] Attempting to read via provider URI"
 drozer_cmd "$DROZER_DIR/D7_provider_read.txt" \
   "run app.provider.read --uri content://$PKG/"
 
-# Insert via provider
+info "  [D8] Attempting to insert via provider"
 drozer_cmd "$DROZER_DIR/D8_provider_insert.txt" \
   "run app.provider.insert --uri content://$PKG/ --extra string key value"
 
-# Update via provider
+info "  [D9] Attempting to update via provider"
 drozer_cmd "$DROZER_DIR/D9_provider_update.txt" \
   "run app.provider.update --uri content://$PKG/ --where '_id=1' --extra string key newvalue"
 
-# Delete via provider
+info "  [D10] Attempting to delete via provider"
 drozer_cmd "$DROZER_DIR/D10_provider_delete.txt" \
   "run app.provider.delete --uri content://$PKG/ --where '_id=1'"
 
-ok "Content providers complete"
+ok "  Content providers complete (10 commands)"
 
 # ============================================================
 # E. BROADCAST RECEIVERS (all flags)
 # ============================================================
-info "=== E. Broadcast Receivers ==="
+info "[step-7/10] === E. Broadcast Receiver Enumeration & Testing ==="
 
-# -a = package
+info "  [E1] Listing broadcast receivers (app.broadcast.info -a $PKG)"
 drozer_cmd "$DROZER_DIR/E1_receivers.txt" \
   "run app.broadcast.info -a $PKG"
 
-# Send broadcast with flags:
-#   --component (-n) = target component
-#   --action (-a) = intent action
-#   --extra (-e) = extras (string, int, long, float, boolean, etc.)
+info "  [E2] Sending BOOT_COMPLETED broadcast"
 drozer_cmd "$DROZER_DIR/E2_broadcast_send_boot.txt" \
   "run app.broadcast.send --component $PKG --action android.intent.action.BOOT_COMPLETED"
 
+info "  [E3] Sending custom action broadcast with extras"
 drozer_cmd "$DROZER_DIR/E3_broadcast_send_custom.txt" \
   "run app.broadcast.send --component $PKG --action com.$PKG.CUSTOM_ACTION --extra string data test"
 
+info "  [E4] Sending BATTERY_LOW broadcast"
 drozer_cmd "$DROZER_DIR/E4_broadcast_send_battery.txt" \
   "run app.broadcast.send --action android.intent.action.BATTERY_LOW"
 
+info "  [E5] Sending CONNECTIVITY_CHANGE broadcast"
 drozer_cmd "$DROZER_DIR/E5_broadcast_send_connectivity.txt" \
   "run app.broadcast.send --action android.net.conn.CONNECTIVITY_CHANGE"
 
-# Send broadcast to non-exported receiver (via component)
+info "  [E6] Attempting to send to non-exported receiver (InternalReceiver)"
 drozer_cmd "$DROZER_DIR/E6_broadcast_send_internal.txt" \
   "run app.broadcast.send --component $PKG/.InternalReceiver --action com.$PKG.INTERNAL"
 
-ok "Broadcast receivers complete"
+ok "  Broadcast receivers complete (6 commands)"
 
 # ============================================================
 # F. INTENT INJECTION (all flags)
 # ============================================================
-info "=== F. Intent Injection ==="
+info "[step-8/10] === F. Intent Injection Testing ==="
 
-# Intent send with all flags:
-#   --action (-a) = intent action
-#   --component (-n) = target component
-#   --data-uri (-d) = data URI
-#   --type (-t) = MIME type
-#   --extra (-e) = extras (string, int, long, float, boolean)
-#   --flags (-f) = intent flags (e.g. 0x10000000 for FLAG_ACTIVITY_NEW_TASK)
-#   --grant-read-uri-permission
-#   --grant-write-uri-permission
-
+info "  [F1] Sending VIEW intent with file:// URI (shared_prefs)"
 drozer_cmd "$DROZER_DIR/F1_intent_view_file.txt" \
   "run app.intent.send --action android.intent.action.VIEW --data-uri 'file:///data/data/$PKG/shared_prefs'"
 
+info "  [F2] Sending VIEW intent with http:// URI (proxy redirect)"
 drozer_cmd "$DROZER_DIR/F2_intent_view_http.txt" \
   "run app.intent.send --action android.intent.action.VIEW --data-uri 'http://127.0.0.1:8080' --flags 0x10000000"
 
+info "  [F3] Sending SEND intent with text payload to ShareActivity"
 drozer_cmd "$DROZER_DIR/F3_intent_send_data.txt" \
   "run app.intent.send --action android.intent.action.SEND --type 'text/plain' --extra string text 'injected data' --component $PKG/.ShareActivity"
 
+info "  [F4] Sending VIEW intent with content:// URI (grant-read)"
 drozer_cmd "$DROZER_DIR/F4_intent_view_content.txt" \
   "run app.intent.send --action android.intent.action.VIEW --data-uri 'content://$PKG/' --grant-read-uri-permission"
 
+info "  [F5] Sending PICK intent for image/*"
 drozer_cmd "$DROZER_DIR/F5_intent_pick.txt" \
   "run app.intent.send --action android.intent.action.PICK --type 'image/*'"
 
+info "  [F6] Sending GET_CONTENT intent for */*"
 drozer_cmd "$DROZER_DIR/F6_intent_get_content.txt" \
   "run app.intent.send --action android.intent.action.GET_CONTENT --type '*/*'"
 
-# Non-exported activity launch with FLAG_GRANT_READ_URI_PERMISSION
+info "  [F7] Attempting non-exported activity launch with grant permissions"
 drozer_cmd "$DROZER_DIR/F7_intent_nonexported.txt" \
   "run app.intent.send --component $PKG/.ExportedActivity --action com.$PKG.ACTION --flags 0x10000000 --grant-read-uri-permission --grant-write-uri-permission"
 
-ok "Intent injection complete"
+ok "  Intent injection complete (7 commands)"
 
 # ============================================================
 # G. SHELL ACCESS (all flags)
 # ============================================================
-info "=== G. Shell Access ==="
+info "[step-9/10] === G. Shell Access Testing ==="
 
-# shell.id
+info "  [G1] Checking drozer shell UID (shell.id)"
 drozer_cmd "$DROZER_DIR/G1_shell_id.txt" \
   "run shell.id"
 
-# shell.call with args
+info "  [G2] Executing /system/bin/id via shell.call"
 drozer_cmd "$DROZER_DIR/G2_shell_call_id.txt" \
   "run shell.call /system/bin/id"
 
+info "  [G3] Executing /system/bin/ps via shell.call"
 drozer_cmd "$DROZER_DIR/G3_shell_call_ps.txt" \
   "run shell.call /system/bin/ps"
 
+info "  [G4] Reading /etc/hosts via shell.call"
 drozer_cmd "$DROZER_DIR/G4_shell_call_cat.txt" \
   "run shell.call /system/bin/cat /etc/hosts"
 
-# shell.start (interactive)
+info "  [G5] Attempting interactive shell (shell.start)"
 drozer_cmd "$DROZER_DIR/G5_shell_start.txt" \
   "run shell.start"
 
-ok "Shell access complete"
+ok "  Shell access complete (5 commands)"
 
 # ============================================================
 # H. SCANNER MODULES (all flags)
 # ============================================================
-info "=== H. Scanners ==="
+info "[step-10/10] === H. Scanner Modules ==="
 
-# SQL injection detection
+info "  [H1] Running SQL injection scanner (scanner.provider.injection)"
 drozer_cmd "$DROZER_DIR/H1_sqli.txt" \
   "run scanner.provider.injection -a $PKG"
 
 if grep -qi "vulnerable\|injection" "$DROZER_DIR/H1_sqli.txt" 2>/dev/null; then
-  warn "SQL injection vulnerability detected!"
+  warn "  SQL injection vulnerability DETECTED"
   fadd "SQL injection in content provider" HIGH HIGH CWE-89 "A03:2021" "$DROZER_DIR/H1_sqli.txt"
+else
+  info "  No SQL injection detected"
 fi
 
-# Path traversal detection
+info "  [H2] Running path traversal scanner (scanner.provider.traversal)"
 drozer_cmd "$DROZER_DIR/H2_traversal.txt" \
   "run scanner.provider.traversal -a $PKG"
 
 if grep -qi "traversal\|\.\.\/" "$DROZER_DIR/H2_traversal.txt" 2>/dev/null; then
-  warn "Path traversal detected!"
+  warn "  Path traversal DETECTED"
   fadd "Path traversal via content provider" HIGH HIGH CWE-22 "A01:2021" "$DROZER_DIR/H2_traversal.txt"
+else
+  info "  No path traversal detected"
 fi
 
-# File access detection
+info "  [H3] Running file access scanner (scanner.provider.file)"
 drozer_cmd "$DROZER_DIR/H3_file_access.txt" \
   "run scanner.provider.file -a $PKG"
 
 if grep -qi "read\|write" "$DROZER_DIR/H3_file_access.txt" 2>/dev/null; then
-  warn "File access via provider"
+  warn "  File access via provider DETECTED"
   fadd "Content provider file access" HIGH HIGH CWE-22 "A01:2021" "$DROZER_DIR/H3_file_access.txt"
+else
+  info "  No file access detected"
 fi
 
-# Blob access detection
+info "  [H4] Running blob access scanner (scanner.provider.blob)"
 drozer_cmd "$DROZER_DIR/H4_blob_access.txt" \
   "run scanner.provider.blob -a $PKG"
 
 if grep -qi "blob\|large" "$DROZER_DIR/H4_blob_access.txt" 2>/dev/null; then
-  warn "Blob/large object access via provider"
+  warn "  Blob/large object access DETECTED"
   fadd "Content provider blob access" MEDIUM MEDIUM CWE-200 "A01:2021" "$DROZER_DIR/H4_blob_access.txt"
+else
+  info "  No blob access detected"
 fi
 
-ok "Scanners complete"
+ok "  Scanners complete (4 modules)"
 
 # ============================================================
 # I. EXPLOITATION ATTEMPTS (all flags)
 # ============================================================
-info "=== I. Exploitation ==="
+info "=== I. Exploitation Attempts ==="
 
-# I1. Query with injection in WHERE
+info "  [I1] SQL injection probe: WHERE '1=1 OR 1=1'"
 drozer_cmd "$DROZER_DIR/I1_inject_where.txt" \
   "run app.provider.query content://$PKG/ --where '1=1 OR 1=1' --vertical"
 
-# I2. Query with union-based injection
+info "  [I2] Union-based injection probe: UNION SELECT 1,2,3--"
 drozer_cmd "$DROZER_DIR/I2_inject_union.txt" \
   "run app.provider.query content://$PKG/ --where '1=1 UNION SELECT 1,2,3--' --vertical"
 
-# I3. Query with null injection
+info "  [I3] Null injection probe: NULL IS NULL"
 drozer_cmd "$DROZER_DIR/I3_inject_null.txt" \
   "run app.provider.query content://$PKG/ --where '1=1 AND NULL IS NULL' --vertical"
 
-# I4. Read sensitive files via provider
-for f in \
-  "/data/data/$PKG/shared_prefs" \
-  "/data/data/$PKG/databases" \
-  "/data/data/$PKG/files" \
-  "/data/data/$PKG/cache" \
-  "/etc/hosts" \
-  "/proc/version" \
-  "/proc/self/environ" \
-  "/data/local/tmp"; do
+info "  [I4] Attempting to read sensitive files via provider (8 targets)"
+READ_TARGETS=(
+  "/data/data/$PKG/shared_prefs"
+  "/data/data/$PKG/databases"
+  "/data/data/$PKG/files"
+  "/data/data/$PKG/cache"
+  "/etc/hosts"
+  "/proc/version"
+  "/proc/self/environ"
+  "/data/local/tmp"
+)
+for f in "${READ_TARGETS[@]}"; do
   SAFE_NAME=$(echo "$f" | tr '/' '_' | sed 's/^_//')
+  info "    Reading: $f"
   drozer_cmd "$DROZER_DIR/I4_read_${SAFE_NAME}.txt" \
     "run app.provider.read --uri content://$PKG/$f" 2>/dev/null || true
 done
 
-# I5. Insert test data
+info "  [I5] Attempting provider INSERT with test data"
 drozer_cmd "$DROZER_DIR/I5_insert_test.txt" \
   "run app.provider.insert --uri content://$PKG/ --extra string test_key test_value"
 
-# I6. Update test data
+info "  [I6] Attempting provider UPDATE with test data"
 drozer_cmd "$DROZER_DIR/I6_update_test.txt" \
   "run app.provider.update --uri content://$PKG/ --where '1=1' --extra string test_key pwned"
 
-# I7. Delete test data
+info "  [I7] Sending BOOT_COMPLETED broadcast (abuse test)"
 drozer_cmd "$DROZER_DIR/I7_delete_test.txt" \
   "run app.broadcast.send --component $PKG --action android.intent.action.BOOT_COMPLETED"
 
-# I8. Service abuse with extras
+info "  [I8] Service abuse with credential extras (username=admin, password=password123)"
 drozer_cmd "$DROZER_DIR/I8_service_abuse.txt" \
   "run app.service.send --component $PKG --extra string username admin --extra string password password123"
 
-ok "Exploitation complete"
+ok "  Exploitation attempts complete (8 probes)"
 
 # ============================================================
 # J. RESULTS ANALYSIS
 # ============================================================
-info "=== J. Analysis ==="
+info "=== J. Results Analysis ==="
 
-# Extract exported components from attack surface
+info "  [J1] Extracting attack surface summary"
 ATTACK_SURFACE=$(cat "$DROZER_DIR/A4_attack_surface.txt" 2>/dev/null)
 
-# Create summary
+info "  [J2] Building results summary"
 {
   echo "=== DROZER RESULTS SUMMARY ==="
   echo ""
@@ -370,8 +382,9 @@ ATTACK_SURFACE=$(cat "$DROZER_DIR/A4_attack_surface.txt" 2>/dev/null)
   echo "--- Shell ID ---"
   cat "$DROZER_DIR/G1_shell_id.txt" 2>/dev/null
 } > "$DROZER_DIR/SUMMARY.txt"
+info "  Summary written to $DROZER_DIR/SUMMARY.txt"
 
-# Create findings from analysis
+info "  [J3] Creating findings from scanner results"
 grep -qi "debuggable" "$DROZER_DIR/A7_debuggable.txt" 2>/dev/null && \
   fadd "App is debuggable" HIGH CERTAIN CWE-215 "A05:2021" "$DROZER_DIR/A7_debuggable.txt"
 
@@ -382,7 +395,9 @@ grep -qi "uid=0\|root" "$DROZER_DIR/G1_shell_id.txt" 2>/dev/null && \
   fadd "Root shell access achieved" CRITICAL CERTAIN CWE-269 "A01:2021" "$DROZER_DIR/G1_shell_id.txt"
 
 # Clean up
+info "  [J4] Cleaning up drozer port forward"
 adb forward --remove tcp:31415 2>/dev/null || true
+info "  Port forward removed"
 
 ok "Drozer testing complete -> $DROZER_DIR"
 fsnapshot

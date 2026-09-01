@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Genymotion Pipeline Findings",
+  "description": "Structured findings schema for Android security assessment",
+  "type": "object",
+  "required": ["findings"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Finding" }
+    },
+    "_next_id": { "type": "integer", "minimum": 1 },
+    "metadata": { "$ref": "#/definitions/Metadata" }
+  },
+  "definitions": {
+    "Finding": {
+      "type": "object",
+      "required": ["id", "title", "severity", "confidence", "status", "phase", "timestamp"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F-\\d+$",
+          "description": "Unique finding identifier (F-{counter})"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Concise finding title (impact-first format preferred)"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"],
+          "description": "Severity rating"
+        },
+        "cvss": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "description": "CVSS v3.1 or v4.0 base score"
+        },
+        "cvss_vector": {
+          "type": "string",
+          "description": "Full CVSS vector string (e.g. CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H)"
+        },
+        "cvss_version": {
+          "type": "string",
+          "enum": ["3.1", "4.0"],
+          "default": "3.1",
+          "description": "CVSS version used"
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["CONFIRMED", "PROBABLE", "SUSPECTED", "INFORMATIONAL"],
+          "description": "Confidence level in the finding"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "confirmed", "false-positive", "fixed", "deferred", "accepted"],
+          "description": "Current triage status"
+        },
+        "cwe": {
+          "type": "string",
+          "pattern": "^CWE-\\d+$",
+          "description": "CWE identifier"
+        },
+        "owasp": {
+          "type": "string",
+          "description": "OWASP Top 10 2021 category (e.g. A01:2021)"
+        },
+        "masvs": {
+          "type": "string",
+          "description": "OWASP MASVS v2 control reference (e.g. MASVS-STORAGE-1)"
+        },
+        "phase": {
+          "type": "string",
+          "description": "Pipeline phase that discovered this finding"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 discovery timestamp"
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "File paths or text snippets supporting the finding"
+        },
+        "remediation": {
+          "type": "string",
+          "description": "Recommended fix or mitigation"
+        },
+        "affected_component": {
+          "type": "string",
+          "description": "Specific component, class, or endpoint affected"
+        },
+        "references": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "URLs, CVEs, or documentation references"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Freeform tags for categorization"
+        }
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "properties": {
+        "package": { "type": "string" },
+        "version": { "type": "string" },
+        "target_sdk": { "type": "integer" },
+        "min_sdk": { "type": "integer" },
+        "scanner_version": { "type": "string" },
+        "scan_start": { "type": "string", "format": "date-time" },
+        "scan_end": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

