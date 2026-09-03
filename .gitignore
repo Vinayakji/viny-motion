@@ -1,2 +1,9 @@
 __pycache__/
 *.pyc
+reports/
+findings/
+*.apk
+static/secrets.txt
+**/secrets.txt
+**/secrets.json
+**/secrets.env
