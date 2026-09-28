@@ -7,10 +7,14 @@
 #   ./run.sh check               # pre-flight: config, tools
 #   ./run.sh --rag <phase...>    # same, plus RAG knowledge dispatch
 #   ./run.sh vapt_handoff        # extract findings for VAPT pipeline
+#   ./run.sh retest [db]         # retest/closure report (retest-mark <id> FIXED)
 set -uo pipefail
 PIPELINE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 source "$PIPELINE_ROOT/lib/common.sh"
 source "$PIPELINE_ROOT/lib/objection_helpers.sh"
+source "$PIPELINE_ROOT/lib/scope_gate.sh"
+source "$PIPELINE_ROOT/lib/retest.sh"
+source "$HOME/laya_orchestrator/laya_hook.sh" 2>/dev/null || true
 
 RAG=0
 VAPT_HANDOFF=0
@@ -59,12 +63,20 @@ run_one() {
   local ph="$1"
   [ -f "$PIPELINE_ROOT/phases/$ph.sh" ] || { err "unknown phase $ph"; exit 1; }
   info "=== PHASE $ph ==="
+  if ! laya_health_check; then
+    return 1
+  fi
+  if ! laya_gate "$ph"; then
+    err "LAYA gate blocked phase $ph"
+    return 1
+  fi
   [ "$RAG" = 1 ] && "$PIPELINE_ROOT/extras/skill_dispatch.sh" "$ph" 2>/dev/null || true
   bash "$PIPELINE_ROOT/phases/$ph.sh"
   echo
 }
 
 check() {
+  require_authorization || return 1
   echo "== PRE-FLIGHT =="
   echo "apk         : $(tget apk path || echo NOT SET)"
   echo "package     : $(tget apk package_name || echo NOT SET)"
@@ -72,6 +84,7 @@ check() {
   echo "proxy       : $(tget proxy host):$(tget proxy port)"
   echo "run dir     : $RUN_DIR"
   echo "phases      : ${#PHASES[@]} total"
+  echo "jev         : $([ -f "$HOME/.config/opencode/jev/jev_server.py" ] && echo READY || echo MISSING)"
   echo "new modules : deep_links, objection_helpers"
   echo "tools       :"
   for t in adb drozer objection frida jadx frida-ps frida-trace jq; do
@@ -143,14 +156,29 @@ EOF
 case "${1:-all}" in
   list) printf '%s\n' "${PHASES[@]}" ;;
   check) check ;;
+  retest)
+    require_authorization || exit 1
+    retest_generate "${2:-$FINDINGS_DIR/findings.json}"
+    echo
+    retest_summary "${2:-$FINDINGS_DIR/findings.json}"
+    echo
+    echo "Mark closures with: ./run.sh retest-mark <finding-id> FIXED|OPEN|PARTIAL [note]"
+    ;;
+  retest-mark)
+    require_authorization || exit 1
+    retest_mark "$2" "$3" "$4"
+    ;;
   vapt_handoff) vapt_handoff ;;
   all)
-    check
+    check || exit 1
+    # Fix Genymotion internet (clear dead global proxy)
+    "$PIPELINE_ROOT/extras/fix-genymotion-internet.sh" 2>/dev/null || true
     echo "== FULL RUN: $(date -Iseconds) =="
     for ph in "${PHASES[@]}"; do run_one "$ph"; done
     vapt_handoff
     ;;
   *)
+    require_authorization || exit 1
     for ph in "$@"; do
       case "$ph" in
         vapt_handoff) vapt_handoff ;;

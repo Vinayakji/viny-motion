@@ -44,7 +44,7 @@ info "  Total unique target endpoints: $EP_COUNT"
 # ============================================================
 # Helper: Send HTTP request
 # ============================================================
-JWT_FILE="/tmp/jwt_token.txt"
+JWT_FILE="/home/user/tools/apk_pentest/jwt_token.txt"
 AUTH_HEADER=""
 [ -f "$JWT_FILE" ] && AUTH_HEADER="-H Authorization:Bearer\ $(cat "$JWT_FILE")"
 

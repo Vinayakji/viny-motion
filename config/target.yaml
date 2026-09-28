@@ -1,3 +1,7 @@
+target:
+  name: "example-app"
+  authorization_ref: "Authorized VAPT engagement - written scope signed"
+
 apk:
   path: /path/to/app.apk
   package_name: com.example.app

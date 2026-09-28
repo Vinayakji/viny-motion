@@ -3,7 +3,7 @@
 set -uo pipefail
 
 PIPELINE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG="$PIPELINE_ROOT/config/target.yaml"
+CONFIG="${TARGET_CONFIG:-$PIPELINE_ROOT/config/target.yaml}"
 FINDINGS_DIR="$PIPELINE_ROOT/findings"
 REPORTS_DIR="$PIPELINE_ROOT/reports"
 mkdir -p "$FINDINGS_DIR" "$REPORTS_DIR"

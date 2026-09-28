@@ -15,20 +15,30 @@ DROZER_DIR="$RUN_DIR/drozer"
 mkdir -p "$DROZER_DIR"
 
 # ---- Helpers ----
+# drozer 3.x console requires a pty for batch input; wrap with `script`.
 drozer_cmd() {
   local outfile="${1:-/dev/null}"
   shift
-  printf '%s\n' "$@" | drozer console connect 2>/dev/null > "$outfile"
+  printf '%s\n' "$@" "exit" | script -qec "timeout 90 drozer console connect" /dev/null 2>/dev/null > "$outfile"
 }
 
-# ---- 1. Start drozer + port forward ----
-info "[step-1/10] Starting drozer server and establishing port forward"
-info "  Starting ServerService on device..."
-adb shell "am startservice -n com.mwr.dz/.services.ServerService" 2>/dev/null || true
+# ---- 1. Start drozer agent embedded server + port forward ----
+# drozer-agent 3.1.0 (com.withsecure.dz): foreground-allowlist via MainActivity,
+# then start ServerService with START_EMBEDDED category (Android 11 background-start rule).
+info "[step-1/10] Starting drozer agent server and establishing port forward"
+info "  Launching agent MainActivity (foreground allowlist)..."
+adb shell "am start -n com.withsecure.dz/com.WithSecure.dz.activities.MainActivity" 2>/dev/null || true
+sleep 2
+info "  Starting ServerService (START_EMBEDDED)..."
+adb shell "am startservice -n com.withsecure.dz/com.WithSecure.dz.services.ServerService -c com.WithSecure.dz.START_EMBEDDED" 2>/dev/null || true
 info "  Setting up ADB port forward: tcp:31415 -> tcp:31415"
 adb forward tcp:31415 tcp:31415 2>/dev/null
-info "  Waiting 2s for drozer server to initialize..."
-sleep 2
+info "  Waiting 4s for drozer server to initialize..."
+sleep 4
+if ! adb shell "ss -tln 2>/dev/null | grep -q 31415"; then
+  err "  Drozer server NOT listening on 31415 — cannot continue"
+  exit 1
+fi
 ok "  Drozer server ready on port 31415"
 
 # ---- 2. List all modules ----
@@ -66,13 +76,13 @@ info "  [A6] Extracting signing certificate (app.package.certificate)"
 drozer_cmd "$DROZER_DIR/A6_certificate.txt" \
   "run app.package.certificate $PKG"
 
-info "  [A7] Checking debuggable flag (app.package.debuggable)"
+info "  [A7] Checking debuggable flag (app.package.info)"
 drozer_cmd "$DROZER_DIR/A7_debuggable.txt" \
-  "run app.package.debuggable $PKG"
+  "run app.package.info -a $PKG"
 
-info "  [A8] Checking backup flag (app.package.backup)"
+info "  [A8] Checking backup flag (app.package.info)"
 drozer_cmd "$DROZER_DIR/A8_backup.txt" \
-  "run app.package.backup $PKG"
+  "run app.package.info -a $PKG"
 
 ok "  Package enumeration complete (8 commands)"
 
@@ -220,21 +230,21 @@ ok "  Intent injection complete (7 commands)"
 # ============================================================
 info "[step-9/10] === G. Shell Access Testing ==="
 
-info "  [G1] Checking drozer shell UID (shell.id)"
+info "  [G1] Checking drozer shell UID (shell.exec id)"
 drozer_cmd "$DROZER_DIR/G1_shell_id.txt" \
-  "run shell.id"
+  "run shell.exec id"
 
-info "  [G2] Executing /system/bin/id via shell.call"
+info "  [G2] Executing /system/bin/id via shell.exec"
 drozer_cmd "$DROZER_DIR/G2_shell_call_id.txt" \
-  "run shell.call /system/bin/id"
+  "run shell.exec id"
 
-info "  [G3] Executing /system/bin/ps via shell.call"
+info "  [G3] Executing /system/bin/ps via shell.exec"
 drozer_cmd "$DROZER_DIR/G3_shell_call_ps.txt" \
-  "run shell.call /system/bin/ps"
+  "run shell.exec ps"
 
-info "  [G4] Reading /etc/hosts via shell.call"
+info "  [G4] Reading /etc/hosts via shell.exec"
 drozer_cmd "$DROZER_DIR/G4_shell_call_cat.txt" \
-  "run shell.call /system/bin/cat /etc/hosts"
+  "run shell.exec cat /etc/hosts"
 
 info "  [G5] Attempting interactive shell (shell.start)"
 drozer_cmd "$DROZER_DIR/G5_shell_start.txt" \

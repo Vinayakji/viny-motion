@@ -72,7 +72,8 @@ fi
 info "[step-5/8] Setting up Frida server for dynamic instrumentation"
 FRIDA_VERSION="$(frida --version 2>/dev/null || echo '16.0.0')"
 FRIDA_ARCH="$(adb shell getprop ro.product.cpu.abi 2>/dev/null | tr -d '\r')"
-FRIDA_SERVER="/tmp/frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}"
+# Persistent frida-server binary store (was /tmp — wiped on reboot; audit 2026-09-03)
+FRIDA_SERVER="/home/user/tools/frida/frida-server-${FRIDA_VERSION}-android-${FRIDA_ARCH}"
 info "  Frida client version: $FRIDA_VERSION"
 info "  Device architecture: $FRIDA_ARCH"
 info "  Expected server: $FRIDA_SERVER"
