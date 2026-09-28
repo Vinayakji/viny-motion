@@ -269,7 +269,7 @@ else
 
 No findings recorded.
 EOF
-  info "  No findings; assessment report marked empty"
+  info "  No findings; ASSESS report marked empty"
 fi
 
 # ---- 6. Copy reports to findings dir ----

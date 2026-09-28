@@ -49,7 +49,7 @@ flowchart TD
 
     subgraph F["OUTPUT — phase 08"]
         F1[findings.json — severity + CVSS]
-        F2[ASSESS findings report]
+        F2[Security Assessment report]
         F3[VAPT handoff]
     end
 
