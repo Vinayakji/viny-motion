@@ -202,9 +202,11 @@ genymotion-pipeline/
 │   ├── common.sh             # Shared helpers
 │   └── findings.sh           # Findings DB
 ├── extras/
-│   ├── burp-browser/         # Playwright + FoxyProxy → Burp
+│   ├── burp-mcp/             # Burp Suite MCP server (proxy, Repeater, Scanner)
 │   ├── frida-scripts/        # Reusable Frida hooks
-│   └── objection-scripts/    # Reusable objection commands
+│   ├── objection-scripts/    # Reusable objection commands
+│   ├── semgrep/              # MASTG-aligned SAST rules
+│   └── reference/            # Manifest / attack-pattern / frida cheatsheets
 ├── reports/                  # Per-run output
 └── findings/                 # findings.json
 ```
