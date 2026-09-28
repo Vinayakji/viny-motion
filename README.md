@@ -121,7 +121,7 @@ flowchart TD
 | 06 | `traffic_capture.sh` | Burp proxy setup, traffic logging, API endpoint extraction |
 | 07 | `storage_dump.sh` | Extract SharedPreferences, SQLite, files, keychain |
 | 08 | `findings_report.sh` | Aggregate findings, generate report |
-| 18 | `chainforge.sh` | SQLi + XSS/SSRF/CMDi/IDOR testing across discovered APIs + vulnerability chaining |
+| 18 | `dastforge.sh` | SQLi + XSS/SSRF/CMDi/IDOR testing across discovered APIs + vulnerability chaining |
 
 ---
 
