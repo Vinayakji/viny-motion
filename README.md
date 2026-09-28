@@ -144,7 +144,8 @@ flowchart TD
 The pipeline runs on a **custom Android emulator driver** (`extras/viny-motion-emu.sh`) built on
 the open-source AOSP/QEMU emulator — no Genymotion software, images, or subscriptions.
 See [`docs/emulator-rooting.md`](docs/emulator-rooting.md) for rooting the Play Store image
-and Burp CA/proxy setup.
+and Burp CA/proxy setup, and [`docs/skills-map.md`](docs/skills-map.md) for the skill
+catalog mapped to every phase.
 
 ```bash
 ./extras/viny-motion-emu.sh start              # boot AVD headless (KVM)
