@@ -161,20 +161,35 @@ the driver. Verified: KVM boot ~10s, Android 11 rooted, Frida/objection reachabl
 
 ## Quick Start
 
+> **⚡ STANDALONE MACHINE — INSTALL BOTH EMULATORS IN 3 STEPS** ⚡
+>
+> 1. **`git clone https://github.com/Vinayakji/viny-motion && cd viny-motion`**
+> 2. **`./setup.sh`** — installs pipeline dependencies
+> 3. **`./extras/setup-custom-emulator.sh`** — installs the Android SDK, **BOTH** system images (`google_apis` rooted + `google_apis_playstore` Play Store), and creates **BOTH** AVDs (`viny-motion` + `viny-motion-play`)
+>
+> **Then start testing:**
+> - **`./extras/viny-motion-emu.sh start`** — boot the custom emulator (KVM-accelerated, ~10s)
+> - **`./extras/viny-motion-emu.sh root`** — adb root (userdebug image)
+> - **`./extras/viny-motion-emu.sh install app.apk`** — push an APK
+> - **`./extras/viny-motion-emu.sh proxy 10.0.2.2:8080`** — route through Burp
+> - **`./run.sh all`** — run the full 21-phase pipeline
+>
+> **Requirements on the machine:** Java 17+, KVM (hardware acceleration), ~6GB free disk.
+> **Genymotion-independent** — 100% open-source AOSP/QEMU, no subscriptions.
+
 ```bash
-# 1. Setup dependencies + custom emulator (installs Android SDK, BOTH system images,
-#    and creates the viny-motion + viny-motion-play AVDs) on any fresh machine
+# Manual reference:
 ./setup.sh
 ./extras/setup-custom-emulator.sh
 
-# 2. Edit config
+# Edit config
 vi config/target.yaml
 
-# 3. Boot the custom emulator + run the full pipeline
+# Boot the custom emulator + run the full pipeline
 ./extras/viny-motion-emu.sh start
 ./run.sh all
 
-# 4. Run specific phase
+# Run specific phase
 ./run.sh 01_static
 ./run.sh 04_dynamic_objection
 ```
