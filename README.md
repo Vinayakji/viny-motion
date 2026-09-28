@@ -15,79 +15,94 @@ flowchart TD
     GATE -- "no written scope" --> REFUSE[REFUSED — will not run]
     GATE -- "authorized" --> CHECK{Pre-flight Check<br/>required tools + config/target.yaml}
     CHECK -- "missing" --> FIX[Install missing tools / fix config]
-    CHECK -- "ready" --> A
+    CHECK -- "ready" --> S0
 
-    subgraph A["SAST — STATIC ANALYSIS — phases 01, 16"]
-        A1[Decompile — jadx / apktool / aapt]
-        A1 --> A2[Manifest audit — permissions, exported components, deep links]
-        A1 --> A3[Secrets scan — Firebase, AWS, Stripe, GitHub tokens]
-        A1 --> A4[Native libs — strings / symbols]
-        A1 --> A5[Deep code scan — RCE sinks, crypto, storage, logging]
-        A5 --> A6[Semgrep — MASTG-aligned rules]
+    S0["00 — ACQUIRE<br/>APK from Play Store / APKPure / APKMirror"]
+
+    subgraph S1["01 — STATIC ANALYSIS (SAST)"]
+        direction TB
+        S1a[aapt metadata + jadx decompile]
+        S1b[Manifest audit — permissions / exported components / deep links]
+        S1c[Secrets scan — Firebase / AWS / Stripe / tokens]
+        S1d[Native lib analysis — strings / symbols]
+        S1a --> S1b --> S1c
+        S1a --> S1d
     end
 
-    subgraph B["ENVIRONMENT & RUNTIME — phases 02, 06"]
-        B1[Genymotion emulator]
-        B2[Install APK]
-        B3[Burp proxy + CA cert install]
-        B4[Launch APK on emulator screen]
-        B5[App runs — every request captured live in Burp HTTP history]
-        B1 --> B2
-        B2 --> B4
-        B3 --> B5
-        B4 --> B5
-    end
+    S0 --> S1
 
-    subgraph G["API TESTING — Burp Suite (drives captured endpoints)"]
-        G1[Replay endpoints in Repeater — tamper params / headers / bodies]
-        G2[Auth testing — JWT, tokens, session headers, authz checks]
-        G3[IDOR / BOLA — enumerate object IDs across accounts]
-        G4[Intruder — fuzz params, hidden fields, rate-limit bypass]
-        G1 --> G2 --> G3 --> G4
+    subgraph S2["02 — ENVIRONMENT"]
+        S2a[Genymotion emulator]
+        S2b[Install APK]
+        S2a --> S2b
     end
+    S1 --> S2
 
-    subgraph C["DYNAMIC — phases 03–05"]
-        C1[drozer — IPC / exploit modules]
-        C2[objection — runtime hooking]
-        C3[Frida scripts — SSL / root bypass]
+    subgraph S3["03–05 — DYNAMIC / RUNTIME"]
+        S3a[03 / 03b Drozer — IPC / exploit modules]
+        S3b[04 Objection — runtime hooking / SSL & root bypass]
+        S3c[05 Frida — method tracing / memory / bypass]
+        S3a --> S3b --> S3c
     end
+    S2 --> S3
 
-    subgraph D["DATA & COMPONENTS — phases 07, 10–14"]
-        D1[Storage dump — SQLite / prefs]
-        D2[Deep links & WebView]
-        D3[Backup / crypto / resilience]
+    subgraph S4["06 — BURP TRAFFIC CAPTURE + API TESTING"]
+        S4a[Burp proxy + CA cert on device]
+        S4b[Launch app — live capture → api_endpoints.txt]
+        S4c[Repeater replay / tamper params & headers]
+        S4d[Auth & JWT testing]
+        S4e[IDOR / BOLA — object IDs]
+        S4f[Intruder fuzz / rate limit]
+        S4a --> S4b
+        S4b --> S4c --> S4d --> S4e --> S4f
     end
+    S3 --> S4
 
-    subgraph E["ADVANCED — phases 09, 16, 17"]
-        E1[MobSF DAST]
-        E2[Code analysis]
-        E3[Input validation]
+    subgraph S5["07–14 — COMPONENTS & HARDENING"]
+        S5a[07 Deep links / intent injection]
+        S5b[07 Storage dump — SQLite / prefs / keychain]
+        S5c[10 Backup extract]
+        S5d[11 WebView exploit]
+        S5e[12 PendingIntent abuse]
+        S5f[13 Resilience — anti-debug / root / emulator]
+        S5g[14 Crypto audit]
+        S5h[09 MobSF + DAST]
+        S5a --> S5b
+        S5d --> S5e
+        S5f --> S5g
     end
+    S4 --> S5
 
-    subgraph F["OUTPUT — phase 08"]
-        F1[findings.json — severity + CVSS]
-        F2[Security Assessment report]
-        F3[VAPT handoff]
+    subgraph S6["16–17 — DEEP CODE & INPUT VALIDATION"]
+        S6a[16 Code analysis — RCE sinks / crypto / storage / logs / semgrep]
+        S6b[17 Input validation across discovered APIs]
+        S6a --> S6b
     end
+    S5 --> S6
 
-    A --> B --> G --> C --> D --> E --> F
+    subgraph S7["08 — OUTPUT"]
+        S7a[findings.json — severity + CVSS → Security Assessment report]
+        S7b[vapt_handoff → web VAPT pipeline]
+        S7a --> S7b
+    end
+    S6 --> S7
+
+    S8["15 — CLEANUP<br/>uninstall app / clear proxy / remove temp"]
+    S7 --> S8
 ```
 
-> **On-screen runtime:** once the APK is installed (phase 02) the app is launched and driven
-> on the emulator screen while Burp captures the live traffic (phase 06) — this is where
-> API endpoints, auth flows and hidden requests are discovered for later phases.
->
-> **API testing (Burp Suite):** discovered endpoints are replayed and attacked in Burp —
-> Repeater for tampering params/headers/bodies, auth & JWT testing, IDOR/BOLA object-ID
-> enumeration, and Intruder fuzzing (hidden params, rate-limit bypass). Endpoints/secrets are
-> also handed off via `./run.sh vapt_handoff` to the web VAPT pipeline for deeper API testing.
->
-> **SAST approaches:** the decompiled source is audited across several tracks — manifest
-> hardening (permissions / exported components / deep links), hardcoded secrets (Firebase,
-> AWS, Stripe, GitHub tokens), native-library exposure, and deep code scans for RCE sinks
-> (`Runtime.exec`, deserialization), weak crypto (DES/MD5/ECB), insecure storage
-> (SharedPreferences/SQLite), logging leaks and debug guards — plus a Semgrep pass with
-> MASTG-aligned rules.
+> **What each stage really does** (phase numbers = actual scripts in `phases/`):
+> - **00** downloads the APK; **01** runs SAST (aapt/jadx manifest, secrets, native libs);
+>   **16** deep code scan (RCE sinks, crypto, storage, logs) + Semgrep MASTG rules.
+> - **02** boots Genymotion and installs the APK; **03/03b/04/05** drive it dynamically with
+>   drozer, objection and Frida.
+> - **06** sets the Burp proxy + CA cert, runs the app on screen and captures traffic into
+>   `api_endpoints.txt`, then those endpoints are attacked in Burp (Repeater, auth/JWT,
+>   IDOR/BOLA, Intruder).
+> - **07–14** cover deep links, storage dump, backup, WebView, PendingIntent, resilience
+>   (anti-debug/root/emulator), crypto audit, and MobSF+DAST.
+> - **17** runs input-validation probes across the discovered APIs.
+> - **08** aggregates findings (severity + CVSS) and **15** cleans up the device.
 
 ---
 
