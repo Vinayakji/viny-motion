@@ -118,6 +118,16 @@ CRED_COUNT=$(wc -l < "$CODE_DIR/credential_keywords.txt" 2>/dev/null || echo 0)
 info "  Credential-keyword assignments: $CRED_COUNT"
 [ "$CRED_COUNT" -gt 0 ] && { warn "  $CRED_COUNT hardcoded credential assignments"; fadd "$CRED_COUNT hardcoded credential assignments (gitleaks patterns)" HIGH PROBABLE CWE-798 "A07:2021" --component "source" --tags "secrets,sast" --remediation "Remove hardcoded secrets; use a secrets manager / env vars" "$CODE_DIR/credential_keywords.txt"; }
 
+info "[step-C7/7] Scanning with master secrets scanner (38 patterns + primary regex)"
+if [ -f "$PIPELINE_ROOT/secrets_scanner.py" ]; then
+  python3 "$PIPELINE_ROOT/secrets_scanner.py" "$JADX_DIR/sources/" > "$CODE_DIR/secrets_scanner.txt" 2>&1
+  MASTER_COUNT=$(grep -oE "\([0-9]+ findings\)" "$CODE_DIR/secrets_scanner.txt" | grep -oE "[0-9]+" | head -1 || echo 0)
+  info "  Master scanner findings: ${MASTER_COUNT:-0}"
+  [ "${MASTER_COUNT:-0}" -gt 0 ] && fadd "${MASTER_COUNT} secrets via master scanner (38 patterns)" HIGH PROBABLE CWE-798 "A07:2021" --component "source" --tags "secrets,sast" --remediation "Remove hardcoded secrets; use a secrets manager / env vars" "$CODE_DIR/secrets_scanner.txt"
+else
+  warn "  secrets_scanner.py not present — skipping master scan"
+fi
+
 # ============================================================
 # D. Logging & Debug Analysis
 # ============================================================

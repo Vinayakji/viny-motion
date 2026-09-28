@@ -273,6 +273,7 @@ genymotion-pipeline/
 ├── extras/
 │   ├── burp-mcp/             # Burp Suite MCP server (proxy, Repeater, Scanner)
 │   ├── viny-motion-emu.sh    # Custom AOSP/QEMU emulator driver
+│   ├── secrets_scanner.py    # Master SAST secrets scanner (38 patterns)
 │   ├── frida-scripts/        # Reusable Frida hooks
 │   ├── objection-scripts/    # Reusable objection commands
 │   ├── semgrep/              # MASTG-aligned SAST rules

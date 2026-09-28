@@ -129,6 +129,16 @@ KEYWORD_COUNT=$(wc -l < "$STATIC_DIR/credential_keywords.txt" 2>/dev/null || ech
 info "  Credential-keyword assignments found: $KEYWORD_COUNT"
 [ "$KEYWORD_COUNT" -gt 0 ] && { warn "  $KEYWORD_COUNT hardcoded credential assignments"; fadd "$KEYWORD_COUNT hardcoded credential assignments (gitleaks patterns)" HIGH PROBABLE CWE-798 "A07:2021" --component "source" --tags "secrets,sast" --remediation "Remove hardcoded secrets; use a secrets manager / env vars" "$STATIC_DIR/credential_keywords.txt"; } || ok "  No credential-keyword assignments"
 
+info "  Scanning with master secrets scanner (38 patterns + primary regex)"
+if [ -f "$PIPELINE_ROOT/secrets_scanner.py" ]; then
+  python3 "$PIPELINE_ROOT/secrets_scanner.py" "$JADX_DIR" > "$STATIC_DIR/secrets_scanner.txt" 2>&1
+  MASTER_COUNT=$(grep -oE "\([0-9]+ findings\)" "$STATIC_DIR/secrets_scanner.txt" | grep -oE "[0-9]+" | head -1 || echo 0)
+  info "  Master scanner findings: ${MASTER_COUNT:-0}"
+  [ "${MASTER_COUNT:-0}" -gt 0 ] && fadd "${MASTER_COUNT} secrets via master scanner (38 patterns)" HIGH PROBABLE CWE-798 "A07:2021" --component "source" --tags "secrets,sast" --remediation "Remove hardcoded secrets; use a secrets manager / env vars" "$STATIC_DIR/secrets_scanner.txt"
+else
+  warn "  secrets_scanner.py not present — skipping master scan"
+fi
+
 info "  Scanning for hardcoded URLs"
 grep -rhoE 'https?://[a-zA-Z0-9./_-]+' "$JADX_DIR" 2>/dev/null | sort -u > "$STATIC_DIR/urls.txt"
 URL_COUNT=$(wc -l < "$STATIC_DIR/urls.txt" 2>/dev/null || echo 0)
