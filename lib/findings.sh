@@ -40,14 +40,14 @@ fi
 # fadd() — add finding (backward-compatible + new fields)
 # ──────────────────────────────────────────────────────────────────
 # Usage: fadd "Title" "SEVERITY" "CONFIDENCE" "CWE-xxx" "A01:2021" [evidence_files...]
-# Extended: fadd "Title" "SEV" "CONF" "CWE" "OWASP" --cvss 7.5 --vector "CVSS:..." --masvs "MASVS-..." --remediation "Fix..." --component "com.foo.Bar" --tags "tag1,tag2"
+# Extended: fadd "Title" "SEV" "CONF" "CWE" "OWASP" --cvss 7.5 --vector "CVSS:..." --masvs "MASVS-..." --remediation "Fix..." --component "com.foo.Bar" --tags "tag1,tag2" --refs "ref1,ref2" --screenshot "/path/shot.png" [evidence_files...]
 
 fadd() {
   local title="$1" sev="$2" conf="$3" cwe="$4" owasp="$5"
   shift 5
 
   # Parse optional extended flags
-  local cvss_val="" cvss_vector="" cvss_ver="3.1" masvs="" remediation="" component="" tags_str="" refs_str=""
+  local cvss_val="" cvss_vector="" cvss_ver="3.1" masvs="" remediation="" component="" tags_str="" refs_str="" screenshot=""
   local evidence_files=()
 
   while [[ $# -gt 0 ]]; do
@@ -59,11 +59,11 @@ fadd() {
       --component) component="$2"; shift 2 ;;
       --tags)     tags_str="$2"; shift 2 ;;
       --refs)     refs_str="$2"; shift 2 ;;
-      --status)   ;; # handled below
-      --phase)    ;; # handled below
-      *)          evidence_files+=("$1") ;;
+      --screenshot) screenshot="$2"; shift 2 ;;
+      --status)   shift 2 ;;
+      --phase)    shift 2 ;;
+      *)          evidence_files+=("$1"); shift ;;
     esac
-    shift
   done
 
   # Auto-compute CVSS if not provided
@@ -113,6 +113,7 @@ fadd() {
     --arg masvs "$masvs" \
     --arg rem "$remediation" \
     --arg comp "$component" \
+    --arg shot "$screenshot" \
     --argjson ev "$ev" \
     --argjson tags "$tags_json" \
     --argjson refs "$refs_json" \
@@ -135,6 +136,7 @@ fadd() {
        timestamp: $ts,
        remediation: $rem,
        affected_component: $comp,
+       screenshot: $shot,
        references: $refs,
        tags: $tags
     }]

@@ -40,7 +40,7 @@ err()   { log "ERROR $*"; }
 # Core tools the pipeline REQUIRES before any phase runs (enforced by run.sh check).
 REQUIRED_TOOLS=(
   adb drozer objection frida frida-ps frida-trace
-  jadx apktool aapt jq python3 curl
+  jadx apktool aapt jq python3 curl sqlite3 strings
 )
 
 # Optional tools: enhance specific phases; missing ones are warned, not fatal.

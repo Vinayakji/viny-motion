@@ -56,7 +56,44 @@ cat > "$REPORT_FILE" <<EOF
 EOF
 
 if [ "$TOTAL" -gt 0 ]; then
-  jq -r '.findings[] | "### \(.severity): \(.title)\n\n- **CWE:** \(.cwe)\n- **OWASP:** \(.owasp)\n- **CVSS:** \(.cvss)\n- **Confidence:** \(.confidence)\n- **Phase:** \(.phase)\n- **Timestamp:** \(.timestamp)\n\n**Evidence:**\n\(.evidence | map("- \`\(.\)`") | join("\n"))\n\n---\n"' "$FINDINGS_DB" >> "$REPORT_FILE"
+  while IFS= read -r line; do
+    title=$(echo "$line" | jq -r '.title')
+    severity=$(echo "$line" | jq -r '.severity')
+    cwe=$(echo "$line" | jq -r '.cwe')
+    owasp=$(echo "$line" | jq -r '.owasp')
+    cvss=$(echo "$line" | jq -r '.cvss')
+    conf=$(echo "$line" | jq -r '.confidence')
+    phase=$(echo "$line" | jq -r '.phase')
+    ts=$(echo "$line" | jq -r '.timestamp')
+    component=$(echo "$line" | jq -r '.affected_component // "n/a"')
+    tags=$(echo "$line" | jq -r '.tags // [] | join(", ")')
+    refs=$(echo "$line" | jq -r '.references // [] | join(", ")')
+    screenshot=$(echo "$line" | jq -r '.screenshot // "n/a"')
+    remediation=$(echo "$line" | jq -r '.remediation // "n/a"')
+    evidence=$(echo "$line" | jq -r '.evidence | map("- \u0060" + . + "\u0060") | join("\n")')
+    cat >> "$REPORT_FILE" <<REPORT_FINDING
+### $severity: $title
+
+- **CWE:** $cwe
+- **OWASP:** $owasp
+- **CVSS:** $cvss
+- **Confidence:** $conf
+- **Phase:** $phase
+- **Timestamp:** $ts
+- **Component:** $component
+- **Tags:** $tags
+- **References:** $refs
+- **Screenshot:** $screenshot
+
+**Evidence:**
+$evidence
+
+**Remediation:**
+$remediation
+
+---
+REPORT_FINDING
+  done < <(jq -c '.findings[]' "$FINDINGS_DB")
   info "  $TOTAL findings written to report"
 else
   echo "*No findings recorded.*" >> "$REPORT_FILE"
@@ -183,9 +220,14 @@ ASSESS_BODY
       owasp=$(echo "$line" | jq -r '.owasp')
       cvss=$(echo "$line" | jq -r '.cvss')
       conf=$(echo "$line" | jq -r '.confidence')
-      phase=$(echo "$line" | jq -r '.phase')
+phase=$(echo "$line" | jq -r '.phase')
       ts=$(echo "$line" | jq -r '.timestamp')
-      evidence=$(echo "$line" | jq -r '.evidence | map("- `" + . + "`") | join("\n")')
+      component=$(echo "$line" | jq -r '.affected_component // "n/a"')
+      tags=$(echo "$line" | jq -r '.tags // [] | join(", ")')
+      refs=$(echo "$line" | jq -r '.references // [] | join(", ")')
+      screenshot=$(echo "$line" | jq -r '.screenshot // "n/a"')
+      remediation=$(echo "$line" | jq -r '.remediation // "n/a"')
+      evidence=$(echo "$line" | jq -r '.evidence | map("- \u0060" + . + "\u0060") | join("\n")')
 
       cat >> "$ASSESS_FILE" <<ASSESS_FINDING
 ### Finding $idx: $title
@@ -193,9 +235,16 @@ ASSESS_BODY
 **Severity:** $sev | **CWE:** $cwe | **OWASP:** $owasp | **CVSS:** $cvss | **Confidence:** $conf
 
 **Phase:** $phase | **Timestamp:** $ts
+**Component:** $component
+**Tags:** $tags
+**References:** $refs
+**Screenshot:** $screenshot
 
 **Evidence:**
 $evidence
+
+**Remediation:**
+$remediation
 
 ---
 
