@@ -38,6 +38,14 @@ flowchart TD
         B4 --> B5
     end
 
+    subgraph G["API TESTING — Burp Suite (drives captured endpoints)"]
+        G1[Replay endpoints in Repeater — tamper params / headers / bodies]
+        G2[Auth testing — JWT, tokens, session headers, authz checks]
+        G3[IDOR / BOLA — enumerate object IDs across accounts]
+        G4[Intruder — fuzz params, hidden fields, rate-limit bypass]
+        G1 --> G2 --> G3 --> G4
+    end
+
     subgraph C["DYNAMIC — phases 03–05"]
         C1[drozer — IPC / exploit modules]
         C2[objection — runtime hooking]
@@ -62,12 +70,17 @@ flowchart TD
         F3[VAPT handoff]
     end
 
-    A --> B --> C --> D --> E --> F
+    A --> B --> G --> C --> D --> E --> F
 ```
 
 > **On-screen runtime:** once the APK is installed (phase 02) the app is launched and driven
 > on the emulator screen while Burp captures the live traffic (phase 06) — this is where
 > API endpoints, auth flows and hidden requests are discovered for later phases.
+>
+> **API testing (Burp Suite):** discovered endpoints are replayed and attacked in Burp —
+> Repeater for tampering params/headers/bodies, auth & JWT testing, IDOR/BOLA object-ID
+> enumeration, and Intruder fuzzing (hidden params, rate-limit bypass). Endpoints/secrets are
+> also handed off via `./run.sh vapt_handoff` to the web VAPT pipeline for deeper API testing.
 >
 > **SAST approaches:** the decompiled source is audited across several tracks — manifest
 > hardening (permissions / exported components / deep links), hardcoded secrets (Firebase,
