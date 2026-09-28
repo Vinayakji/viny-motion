@@ -36,7 +36,7 @@ PHASES=(
   05_frida_hooks 06_traffic_capture 07_deep_links 07_storage_dump
   09_mobsf_dast 10_backup_extract 11_webview_exploit
   12_pending_intent 13_resilience 14_crypto_audit
-  16_code_analysis 17_input_validation
+  16_code_analysis 17_input_validation 18_sqli_chaining
   15_cleanup 08_findings_report
 )
 

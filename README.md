@@ -73,10 +73,12 @@ flowchart TD
     end
     S4 --> S5
 
-    subgraph S6["16–17 — DEEP CODE & INPUT VALIDATION"]
+    subgraph S6["16–18 — DEEP CODE & WEB VULN TESTING"]
         S6a[16 Code analysis — RCE sinks / crypto / storage / logs / semgrep]
         S6b[17 Input validation across discovered APIs]
+        S6c[18 SQLi + XSS / SSRF / CMDi / IDOR testing → vulnerability chaining]
         S6a --> S6b
+        S6b --> S6c
     end
     S5 --> S6
 
@@ -99,7 +101,9 @@ flowchart TD
 >   IDOR/BOLA, Intruder).
 > - **07–14** cover deep links, storage dump, backup, WebView, PendingIntent, resilience
 >   (anti-debug/root/emulator), crypto audit, and MobSF+DAST.
-> - **17** runs input-validation probes across the discovered APIs.
+> - **17** runs input-validation probes across the discovered APIs; **18** tests them for
+>   SQLi, XSS, SSRF, command injection and IDOR, then builds vulnerability chains from
+>   co-occurring findings (e.g. SQLi → auth bypass → IDOR, XSS → ATO, SSRF → cloud metadata).
 > - **08** aggregates findings (severity + CVSS) and **15** cleans up the device.
 
 ---
@@ -117,6 +121,7 @@ flowchart TD
 | 06 | `traffic_capture.sh` | Burp proxy setup, traffic logging, API endpoint extraction |
 | 07 | `storage_dump.sh` | Extract SharedPreferences, SQLite, files, keychain |
 | 08 | `findings_report.sh` | Aggregate findings, generate report |
+| 18 | `sqli_chaining.sh` | SQLi + XSS/SSRF/CMDi/IDOR testing across discovered APIs + vulnerability chaining |
 
 ---
 
