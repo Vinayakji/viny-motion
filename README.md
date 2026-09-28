@@ -134,7 +134,7 @@ flowchart TD
 | 15 | `cleanup.sh` | Uninstall app, clear proxy, remove temp files |
 | 16 | `code_analysis.sh` | Deep decompiled code analysis |
 | 17 | `input_validation.sh` | Input validation testing across discovered APIs |
-| 18 | `dastforge.sh` | Context-aware DAST (smart): param-classified SQLi/XSS/SSRF/CMDi/IDOR with pre-probe gating + 2-signal confirmation; `--deep` for brute-force |
+| 18 | `dastforge.sh` | Context-aware DAST (smart): 11 vuln classes — SQLi, XSS, SSRF, CMDi, IDOR, SSTI, LFI, Open Redirect, NoSQLi, JWT, Mass Assignment — param-classified with pre-probe gating + 2-signal confirmation; `--deep` for brute-force |
 | 19 | `rasp_bypass.sh` | Comprehensive RASP bypass — fingerprint, inventory vectors, deploy Frida/Magisk bypass, verify |
 
 ---
