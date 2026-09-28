@@ -223,7 +223,7 @@
           { "type": "static", "pattern": "ProxySelector|proxyHost|HTTP_PROXY|http_proxy|SSLProxy" },
           { "type": "dynamic", "method": "proxy_check" }
         ],
-        "bypass_vectors": ["FoxyProxy with Burp", "Transparent proxy", "VPN interception"],
+        "bypass_vectors": ["Burp WiFi proxy", "Transparent proxy", "VPN interception"],
         "frida_scripts": ["network-interceptor-enhanced.js"]
       },
       {

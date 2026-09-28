@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # setup_burp_proxy.sh - Configure Genymotion device to route traffic through Burp Suite
-# This replaces the web-focused burp-browser for mobile testing
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
