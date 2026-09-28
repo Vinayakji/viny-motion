@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 PIPELINE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# 03b_dynamic_drozer_mcp.sh - Drozer via Genymotion MCP tools (when available)
+# 03b_dynamic_drozer_mcp.sh - Drozer via viny-motion MCP tools (when available)
 PROFILE_PHASE="03b_dynamic_drozer_mcp"
 source "$PIPELINE_ROOT/lib/common.sh"
 source "$PIPELINE_ROOT/lib/findings.sh"
@@ -23,7 +23,7 @@ mkdir -p "$DROZER_DIR"
 
 info "[step-1/3] Generating MCP command reference document"
 cat > "$DROZER_DIR/MCP_COMMANDS.md" <<'EOF'
-# Drozer MCP Commands for Genymotion Pipeline
+# Drozer MCP Commands for viny-motion Pipeline
 
 ## Setup
 genymotion_drozer_server_start
@@ -83,7 +83,7 @@ cat > "$DROZER_DIR/INSTRUCTIONS.txt" <<EOF
 # How to Run Drozer via MCP
 # Generated: $(date -Iseconds)
 #
-# These commands are for opencode with Genymotion MCP tools.
+# These commands are for opencode with viny-motion MCP tools.
 # Do NOT run these in bash.
 #
 # 1. Start server: genymotion_drozer_server_start
@@ -93,5 +93,5 @@ EOF
 
 ok "  Instructions written to $DROZER_DIR/INSTRUCTIONS.txt"
 
-ok "For full drozer testing, run through opencode with Genymotion MCP tools"
+ok "For full drozer testing, run through opencode with viny-motion MCP tools"
 ok "See: $DROZER_DIR/MCP_COMMANDS.md"

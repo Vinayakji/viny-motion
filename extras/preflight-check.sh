@@ -64,7 +64,7 @@ check_dir() {
 }
 
 echo "=============================================="
-echo "  Genymotion APK Pipeline — Preflight Check"
+echo "  viny-motion APK Pipeline — Preflight Check"
 echo "=============================================="
 echo ""
 

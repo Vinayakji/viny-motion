@@ -28,9 +28,9 @@
         "owasp": "M1",
         "cwe": "CWE-284",
         "severity": "INFO",
-        "description": "Detects Android emulators (AVD, Genymotion, BlueStacks, LDPlayer)",
+        "description": "Detects Android emulators (AVD, viny-motion, BlueStacks, LDPlayer)",
         "detection_methods": [
-          { "type": "static", "pattern": "goldfish|generic|sdk_gphone|emulator|Genymotion|/dev/socket/qemud|/dev/qemu_pipe|10.0.2.15" },
+          { "type": "static", "pattern": "goldfish|generic|sdk_gphone|emulator|viny-motion|/dev/socket/qemud|/dev/qemu_pipe|10.0.2.15" },
           { "type": "static", "pattern": "build.goldfish|android.product.model|X86|generic_x86|ro.hardware|ro.product.model" },
           { "type": "dynamic", "method": "build_properties_spoof" },
           { "type": "dynamic", "method": "sensor_check" }

@@ -152,8 +152,8 @@ run_dynamic_analysis() {
   
   local package=$(cat "$static_dir/package_name.txt")
   
-  # 3.1 Setup Genymotion device
-  info "Checking Genymotion device..."
+  # 3.1 Setup viny-motion device
+  info "Checking viny-motion device..."
   adb devices | grep -q "emulator\|device" || { warn "No device connected"; return 1; }
   
   # 3.2 Install APK

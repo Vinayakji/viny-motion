@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/findings.sh - findings DB for Genymotion pipeline
+# lib/findings.sh - findings DB for viny-motion pipeline
 # v2: Schema-validated, CVSS 4.0 support, confidence levels, finding states
 
 PIPELINE_DIR="${PIPELINE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"

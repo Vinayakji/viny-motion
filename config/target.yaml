@@ -10,7 +10,7 @@ apk:
 
 api_hosts: ""
 
-genymotion:
+viny-motion:
   device_name: "127.0.0.1:6555"
   android_version: "16"
 

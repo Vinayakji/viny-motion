@@ -96,7 +96,7 @@ info "=== E. Device Cleanup ==="
 STOP_DEVICE=$(tget general stop_device false)
 info "[step-E1/1] Checking stop_device setting"
 if [ "$STOP_DEVICE" = "true" ] || [ "$STOP_DEVICE" = "True" ]; then
-  info "  stop_device=true; stopping Genymotion device"
+  info "  stop_device=true; stopping viny-motion device"
   adb devices | grep -v "^List" | awk '{print $1}' | while read device; do
     info "    Stopping: $device"
     adb -s "$device" emu kill 2>/dev/null || true

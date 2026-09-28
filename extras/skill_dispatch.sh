@@ -16,7 +16,7 @@ command -v rag >/dev/null 2>&1 || { echo "[skip] rag CLI not installed"; exit 0;
 declare -A PHASE_SKILLS=(
   [00_acquire]="apk download android recon"
   [01_static]="android static analysis manifest decompile secrets"
-  [02_setup_genymotion]="genymotion android emulator setup frida drozer"
+  [02_setup_viny_motion]="viny-motion android emulator setup frida drozer"
   [03_dynamic_drozer]="drozer android enumeration modules attack surface"
   [03b_dynamic_drozer_mcp]="drozer mcp android dynamic testing"
   [04_dynamic_objection]="objection android ssl pinning bypass root detection keystore"

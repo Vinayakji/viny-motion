@@ -28,7 +28,7 @@ if [ -d "$JADX_DIR" ]; then
   fi
 
   info "[step-A2/6] Scanning for emulator detection methods"
-  grep -rn "goldfish\|generic\|sdk_gphone\|emulator\|Android SDK\|Genymotion\|/dev/socket/qemud\|/dev/qemu_pipe\|10.0.2.15\|build.goldfish\|android.product.model\|X86\|generic_x86" "$JADX_DIR/sources/" 2>/dev/null > "$RESILIENCE_DIR/emulator_detection.txt" || true
+  grep -rn "goldfish\|generic\|sdk_gphone\|emulator\|Android SDK\|viny-motion\|/dev/socket/qemud\|/dev/qemu_pipe\|10.0.2.15\|build.goldfish\|android.product.model\|X86\|generic_x86" "$JADX_DIR/sources/" 2>/dev/null > "$RESILIENCE_DIR/emulator_detection.txt" || true
   EMU_COUNT=$(wc -l < "$RESILIENCE_DIR/emulator_detection.txt" 2>/dev/null || echo 0)
   info "  Emulator detection methods: $EMU_COUNT"
   if [ "$EMU_COUNT" -gt 0 ]; then

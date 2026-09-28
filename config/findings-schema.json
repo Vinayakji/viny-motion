@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Genymotion Pipeline Findings",
+  "title": "viny-motion Pipeline Findings",
   "description": "Structured findings schema for Android security assessment",
   "type": "object",
   "required": ["findings"],

@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 PIPELINE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# 02_setup_genymotion.sh - Create/start Genymotion device, install APK
-PROFILE_PHASE="02_setup_genymotion"
+# 02_setup_viny_motion.sh - Create/start viny-motion device, install APK
+PROFILE_PHASE="02_setup_viny_motion"
 source "$PIPELINE_ROOT/lib/common.sh"
 
-DEVICE="$(tget genymotion device_name)"
-ANDROID_VER="$(tget genymotion android_version)"
-RESOLUTION="$(tget genymotion resolution)"
-MEMORY="$(tget genymotion memory)"
+DEVICE="$(tget viny-motion device_name)"
+ANDROID_VER="$(tget viny-motion android_version)"
+RESOLUTION="$(tget viny-motion resolution)"
+MEMORY="$(tget viny-motion memory)"
 PKG="$(tget apk package_name)"
 
 cd "$RUN_DIR" || exit 1
-info "Setting up Genymotion device: $DEVICE"
+info "Setting up viny-motion device: $DEVICE"
 
-# ---- 1. Start Genymotion ----
-info "[step-1/8] Checking Genymotion installation"
+# ---- 1. Start viny-motion ----
+info "[step-1/8] Checking viny-motion installation"
 if [ -x "$HOME/genymotion/genymotion" ] || [ -x "$HOME/genymotion/player" ]; then
-  info "  Found Genymotion binary; starting device '$DEVICE'"
-  genymotion_start "$DEVICE"
-  ok "  Genymotion start command issued"
+  info "  Found viny-motion binary; starting device '$DEVICE'"
+  viny_motion_start "$DEVICE"
+  ok "  viny-motion start command issued"
 else
-  warn "  Genymotion not found at ~/genymotion/genymotion or ~/genymotion/player"
-  warn "  Ensure Genymotion is installed; continuing with existing device"
+  warn "  viny-motion not found at ~/genymotion/genymotion or ~/genymotion/player"
+  warn "  Ensure viny-motion is installed; continuing with existing device"
 fi
 
 # ---- 2. Wait for device ----
@@ -120,7 +120,7 @@ if [ "$ROOT_UID" = "0" ]; then
   fi
 else
   warn "  No root access (uid=$ROOT_UID); some tests will be limited"
-  warn "  Genymotion devices are usually pre-rooted; check Settings > About"
+  warn "  viny-motion devices are usually pre-rooted; check Settings > About"
 fi
 
 # ---- 8. Check MobSF ----
@@ -140,5 +140,5 @@ else
   warn "  MobSF not found (optional; install from https://github.com/MobSF/Mobile-Security-Framework-MobSF)"
 fi
 
-ok "Genymotion setup complete"
+ok "viny-motion setup complete"
 info "Final device state: $DEVICE | Model: $DEVICE_MODEL | Android: $ANDROID_VERSION | State: $(adb get-state 2>/dev/null || echo unknown)"

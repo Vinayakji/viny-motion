@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_burp_proxy.sh - Configure Genymotion device to route traffic through Burp Suite
+# setup_burp_proxy.sh - Configure viny-motion device to route traffic through Burp Suite
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

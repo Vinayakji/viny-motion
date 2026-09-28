@@ -1,6 +1,6 @@
-# Genymotion APK Pentesting Pipeline
+# viny-motion APK Pentesting Pipeline
 
-Automated mobile application security testing pipeline using Genymotion emulator. Covers APK acquisition → static analysis → dynamic instrumentation → traffic capture → findings reporting.
+Automated mobile application security testing pipeline using viny-motion emulator. Covers APK acquisition → static analysis → dynamic instrumentation → traffic capture → findings reporting.
 
 > **Authorized engagements only.** Always obtain written scope before testing any application.
 
@@ -32,7 +32,7 @@ flowchart TD
     S0 --> S1
 
     subgraph S2["02 — ENVIRONMENT"]
-        S2a[Genymotion emulator]
+        S2a[viny-motion emulator]
         S2b[Install APK]
         S2a --> S2b
     end
@@ -94,7 +94,7 @@ flowchart TD
 > **What each stage really does** (phase numbers = actual scripts in `phases/`):
 > - **00** downloads the APK; **01** runs SAST (aapt/jadx manifest, secrets, native libs);
 >   **16** deep code scan (RCE sinks, crypto, storage, logs) + Semgrep MASTG rules.
-> - **02** boots Genymotion and installs the APK; **03/03b/04/05** drive it dynamically with
+> - **02** boots viny-motion and installs the APK; **03/03b/04/05** drive it dynamically with
 >   drozer, objection and Frida.
 > - **06** sets the Burp proxy + CA cert, runs the app on screen and captures traffic into
 >   `api_endpoints.txt`, then those endpoints are attacked in Burp (Repeater, auth/JWT,
@@ -114,9 +114,9 @@ flowchart TD
 |-------|--------|-------------|
 | 00 | `acquire.sh` | Download APK from Play Store / APKPure / APKMirror |
 | 01 | `static.sh` | jadx decompile, manifest audit, secrets, native libs |
-| 02 | `setup_genymotion.sh` | Create/start Genymotion device, install APK |
+| 02 | `setup_viny_motion.sh` | Create/start viny-motion device, install APK |
 | 03 | `dynamic_drozer.sh` | Drozer enumeration + exploitation modules |
-| 03b | `dynamic_drozer_mcp.sh` | Drozer via Genymotion MCP tools (when available) |
+| 03b | `dynamic_drozer_mcp.sh` | Drozer via viny-motion MCP tools (when available) |
 | 04 | `dynamic_objection.sh` | Frida-based runtime hooking (SSL pinning, root bypass, keychain) |
 | 05 | `frida_hooks.sh` | Custom Frida scripts (method tracing, memory search, SSL bypass) |
 | 06 | `traffic_capture.sh` | Burp proxy setup, traffic logging, API endpoint extraction |
@@ -167,7 +167,7 @@ required tool or config value is missing, the run aborts with a list of what to 
 
 | Tool | Purpose | Install |
 |------|---------|---------|
-| Genymotion | Android emulator | `~/genymotion-3.10.0-linux_x64.run` |
+| viny-motion | Android emulator | `~/genymotion-3.10.0-linux_x64.run` |
 | adb | Android Debug Bridge | `apt install android-tools-adb` |
 | drozer | Android security testing | `pip install drozer` |
 | objection | Frida-based runtime pentesting | `pip install objection` |
@@ -179,7 +179,7 @@ required tool or config value is missing, the run aborts with a list of what to 
 | python3 / curl | Runtime + HTTP | system |
 
 Config keys required in `config/target.yaml`: `apk.path`, `apk.package_name`,
-`genymotion.device_name`, `proxy.host`, `proxy.port`, `target.authorization_ref`.
+`viny-motion.device_name`, `proxy.host`, `proxy.port`, `target.authorization_ref`.
 
 ### Optional (phases degrade gracefully — warned, not fatal)
 
@@ -202,7 +202,7 @@ genymotion-pipeline/
 ├── phases/
 │   ├── 00_acquire.sh         # APK download
 │   ├── 01_static.sh          # Static analysis (jadx, secrets, manifest)
-│   ├── 02_setup_genymotion.sh # Emulator setup + APK install
+│   ├── 02_setup_viny_motion.sh # Emulator setup + APK install
 │   ├── 03_dynamic_drozer.sh  # Drozer modules
 │   ├── 03b_dynamic_drozer_mcp.sh # Drozer via MCP tools
 │   ├── 04_dynamic_objection.sh # Objection/Frida hooks
@@ -248,8 +248,8 @@ apk:
 
 api_hosts: ""                        # optional: restrict API testing to these hosts (comma-separated)
 
-genymotion:
-  device_name: "pipeline-test"        # Genymotion device name
+viny-motion:
+  device_name: "pipeline-test"        # viny-motion device name
   android_version: "11.0"            # Android version
   resolution: "1080x1920"            # Screen resolution
   memory: 4096                        # RAM in MB
@@ -274,7 +274,7 @@ auth:
 
 - **APK Acquisition** — download from Play Store (via adb), APKPure, APKMirror
 - **Static Analysis** — jadx decompilation, AndroidManifest audit, hardcoded secrets, API endpoints, native library analysis
-- **Genymotion Management** — device creation, start/stop, APK installation
+- **viny-motion Management** — device creation, start/stop, APK installation
 - **Drozer Testing** — content provider enumeration, service exploitation, activity injection
 - **Objection/Frida** — SSL pinning bypass, root detection bypass, keychain dump, method hooking
 - **Custom Frida Scripts** — method tracing, memory search, SSL bypass, certificate pinning removal
@@ -297,7 +297,7 @@ auth:
 ```bash
 ./run.sh 00_acquire             # Download APK
 ./run.sh 01_static              # Static analysis
-./run.sh 02_setup_genymotion    # Setup emulator
+./run.sh 02_setup_viny_motion    # Setup emulator
 ./run.sh 06_traffic_capture     # Capture traffic
 ./run.sh 18_dastforge           # SQLi / XSS / SSRF / CMDi / IDOR + chaining
 ```

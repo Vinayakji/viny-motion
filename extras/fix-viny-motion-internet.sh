@@ -1,12 +1,12 @@
 #!/bin/bash
-# fix-genymotion-internet.sh — Clear dead global proxy blocking Genymotion internet
+# fix-viny-motion-internet.sh — Clear dead global proxy blocking viny-motion internet
 # Root cause: Android sets global HTTP proxy to QEMU SLIRP gateway (10.0.2.2:8080)
 # which is NOT a real HTTP proxy. All app traffic fails.
 #
 # WiFi proxy (Burp Suite at host:8081) is separate and correct — left untouched.
 #
-# Usage: ./fix-genymotion-internet.sh [serial]
-# Run after every Genymotion boot or when apps can't reach internet.
+# Usage: ./fix-viny-motion-internet.sh [serial]
+# Run after every viny-motion boot or when apps can't reach internet.
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ if ! $ADB shell echo ok &>/dev/null; then
     exit 1
 fi
 
-log "Genymotion Internet Fix"
+log "viny-motion Internet Fix"
 echo "========================"
 
 # Show current state

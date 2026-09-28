@@ -50,7 +50,7 @@ fi
 
 # A2: Emulator detection
 info "[step-A2/9] RASP-002: Emulator Detection"
-EMU_HITS=$(grep -rn "goldfish\|generic\|sdk_gphone\|emulator\|Genymotion\|/dev/socket/qemud\|/dev/qemu_pipe\|10.0.2.15\|build.goldfish\|android.product.model\|ro.hardware.*goldfish\|generic_x86" "$JADX_DIR/sources/" 2>/dev/null | wc -l)
+EMU_HITS=$(grep -rn "goldfish\|generic\|sdk_gphone\|emulator\|viny-motion\|/dev/socket/qemud\|/dev/qemu_pipe\|10.0.2.15\|build.goldfish\|android.product.model\|ro.hardware.*goldfish\|generic_x86" "$JADX_DIR/sources/" 2>/dev/null | wc -l)
 info "  Emulator detection signatures: $EMU_HITS"
 
 # A3: Anti-debug detection

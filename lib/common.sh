@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/common.sh - shared helpers for Genymotion pipeline
+# lib/common.sh - shared helpers for viny-motion pipeline
 set -uo pipefail
 
 PIPELINE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -64,7 +64,7 @@ require_tools() {
 # Verify required config keys are set in config/target.yaml. Returns non-zero if any are empty.
 require_config() {
   local rc=0 key
-  for key in "apk path" "apk package_name" "genymotion device_name" "proxy host" "proxy port" "target authorization_ref"; do
+  for key in "apk path" "apk package_name" "viny-motion device_name" "proxy host" "proxy port" "target authorization_ref"; do
     [ -n "$(tget $key)" ] || { err "config missing: $key  (set it in config/target.yaml)"; rc=1; }
   done
   return $rc
@@ -92,22 +92,22 @@ adb_launch() {
   fi
 }
 
-# ---- Genymotion helpers ----
-genymotion_start() {
+# ---- viny-motion helpers ----
+viny_motion_start() {
   local device="$1"
-  info "Starting Genymotion device: $device"
+  info "Starting viny-motion device: $device"
   "$HOME/genymotion/genymotion" --vm-start "$device" 2>/dev/null || \
   "$HOME/genymotion/player" --vm-start "$device" 2>/dev/null || \
-  warn "Could not start Genymotion device (is it installed?)"
+  warn "Could not start viny-motion device (is it installed?)"
   sleep 10
 }
 
-genymotion_stop() {
+viny_motion_stop() {
   local device="$1"
-  info "Stopping Genymotion device: $device"
+  info "Stopping viny-motion device: $device"
   "$HOME/genymotion/genymotion" --vm-stop "$device" 2>/dev/null || \
   "$HOME/genymotion/player" --vm-stop "$device" 2>/dev/null || \
-  warn "Could not stop Genymotion device"
+  warn "Could not stop viny-motion device"
 }
 
 # ---- proxy setup ----

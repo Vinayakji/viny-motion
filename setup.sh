@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh - Genymotion Pipeline dependency installer
+# setup.sh - viny-motion Pipeline dependency installer
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -11,7 +11,7 @@ info() { echo -e "[...] $*"; }
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=========================================="
-echo "  Genymotion APK Pentesting Pipeline"
+echo "  viny-motion APK Pentesting Pipeline"
 echo "=========================================="
 echo ""
 
@@ -22,14 +22,14 @@ for cmd in bash curl jq python3 adb; do
   command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd (not found)"
 done
 
-# Check Genymotion
+# Check viny-motion
 if [ -d "$HOME/genymotion" ]; then
-  ok "Genymotion ($HOME/genymotion)"
+  ok "viny-motion ($HOME/genymotion)"
 else
-  fail "Genymotion not found at ~/genymotion"
+  fail "viny-motion not found at ~/genymotion"
 fi
 
-# Check Genymotion binary
+# Check viny-motion binary
 if [ -x "$HOME/genymotion/genymotion" ]; then
   ok "genymotion binary"
 elif [ -x "$HOME/genymotion/player" ]; then
@@ -85,7 +85,7 @@ if [ ! -f "$CONFIG" ]; then
   info "Creating config template..."
   cat > "$CONFIG" <<'YAML'
 # ============================================================
-# Genymotion Pipeline - target config
+# viny-motion Pipeline - target config
 # ============================================================
 
 apk:
@@ -93,8 +93,8 @@ apk:
   package_name: ""                      # Android package name (e.g. com.example.app)
   download_url: ""                      # Or provide download URL
 
-genymotion:
-  device_name: "pipeline-test"          # Genymotion device name
+viny-motion:
+  device_name: "pipeline-test"          # viny-motion device name
   android_version: "11.0"              # Android version
   resolution: "1080x1920"              # Screen resolution
   memory: 4096                          # RAM in MB
@@ -131,7 +131,7 @@ echo "=========================================="
 echo ""
 echo "Next steps:"
 echo "  1. Edit config/target.yaml with your APK and device settings"
-echo "  2. Ensure Genymotion is installed: ~/genymotion/genymotion"
+echo "  2. Ensure viny-motion is installed: ~/genymotion/genymotion"
 echo "  3. Run: ./run.sh check"
 echo "  4. Run: ./run.sh all"
 echo ""

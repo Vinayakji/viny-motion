@@ -30,7 +30,7 @@ info "  Breakdown: CRITICAL=$CRITICAL | HIGH=$HIGH | MEDIUM=$MEDIUM | LOW=$LOW |
 info "[step-2/6] Writing main report: $REPORT_FILE"
 
 cat > "$REPORT_FILE" <<EOF
-# Genymotion Pipeline - Security Report
+# viny-motion Pipeline - Security Report
 
 **Package:** $PKG
 **Date:** $(date -Iseconds)
@@ -119,7 +119,7 @@ cat > "$SUMMARY_FILE" <<EOF
   "phases_run": [
     "00_acquire",
     "01_static",
-    "02_setup_genymotion",
+    "02_setup_viny_motion",
     "03_dynamic_drozer",
     "03b_dynamic_drozer_mcp",
     "04_dynamic_objection",
@@ -176,7 +176,7 @@ if [ "$TOTAL" -gt 0 ]; then
 
 **Date:** $(date -Iseconds)
 **Target:** $PKG
-**Pipeline:** Genymotion APK Pentesting Pipeline
+**Pipeline:** viny-motion APK Pentesting Pipeline
 **Total Findings:** $TOTAL (CRITICAL: $CRITICAL, HIGH: $HIGH, MEDIUM: $MEDIUM, LOW: $LOW, INFO: $INFO)
 
 ---
