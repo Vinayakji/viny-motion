@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 PIPELINE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# 18_sqli_chaining.sh - SQL injection + multi-class web vuln testing + vulnerability chaining
+# 18_chainforge.sh - SQL injection + multi-class web vuln testing + vulnerability chaining
 #   Tests discovered APIs for SQLi, reflected XSS, SSRF, command injection and IDOR/BOLA,
 #   then builds vulnerability chains from co-occurring findings on the same endpoints.
-PROFILE_PHASE="18_sqli_chaining"
+PROFILE_PHASE="18_chainforge"
 source "$PIPELINE_ROOT/lib/common.sh"
 source "$PIPELINE_ROOT/lib/findings.sh"
 
