@@ -82,8 +82,6 @@ flowchart TD
 
     subgraph S7["08 — OUTPUT"]
         S7a[findings.json — severity + CVSS → Security Assessment report]
-        S7b[vapt_handoff → web VAPT pipeline]
-        S7a --> S7b
     end
     S6 --> S7
 
@@ -310,22 +308,6 @@ frida-trace -U -i "*.login*" com.example.app
 # Custom hook
 frida -U -f com.example.app -l extras/frida-scripts/method-tracer.js --no-pause
 ```
-
----
-
-## Integration with VAPT Pipeline
-
-This pipeline is designed to work standalone or as part of the larger VAPT pipeline:
-
-```bash
-# From VAPT pipeline: hand off APK to Genymotion pipeline
-./extras/apk_handoff.sh /path/to/app.apk
-
-# From Genymotion pipeline: hand off findings to VAPT pipeline
-# (outputs hosts/keys that can be fed into VAPT phases)
-```
-
----
 
 ## Disclaimer
 

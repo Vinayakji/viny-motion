@@ -32,7 +32,6 @@ instrumentation, traffic capture, storage extraction, and reporting.
 - Run one phase: `./run.sh 01_static` (see `./run.sh list` for all)
 - Run selected phases: `./run.sh 00_acquire 02_setup_genymotion 04_dynamic_objection`
 - Add RAG knowledge dispatch per phase: `./run.sh --rag <phase...>`
-- Hand findings to the web VAPT pipeline: `./run.sh vapt_handoff`
 
 ## Phase map (phases/*.sh)
 

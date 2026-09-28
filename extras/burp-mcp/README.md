@@ -65,4 +65,3 @@ Add to `~/.cline/data/settings/cline_mcp_settings.json`:
 - **Phase 06** routes the emulator's traffic through the Burp proxy (`proxy.host`/`proxy.port`
   in `config/target.yaml`) and extracts endpoints into `traffic/api_endpoints.txt`.
 - Those endpoints are then attacked in Burp (Repeater / Intruder / Scanner) via the MCP tools.
-- `./run.sh vapt_handoff` copies discovered endpoints + secrets for the web VAPT pipeline.
