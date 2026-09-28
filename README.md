@@ -73,12 +73,14 @@ flowchart TD
     end
     S4 --> S5
 
-    subgraph S6["16–18 — DEEP CODE & WEB VULN TESTING"]
+    subgraph S6["16–19 — DEEP CODE, WEB VULN & RASP BYPASS"]
         S6a[16 Code analysis — RCE sinks / crypto / storage / logs / semgrep]
         S6b[17 Input validation across discovered APIs]
         S6c[18 SQLi + XSS / SSRF / CMDi / IDOR testing → vulnerability chaining]
+        S6d[19 RASP bypass — fingerprint SDK, inventory vectors, Frida/Magisk bypass]
         S6a --> S6b
         S6b --> S6c
+        S6c --> S6d
     end
     S5 --> S6
 
@@ -133,6 +135,7 @@ flowchart TD
 | 16 | `code_analysis.sh` | Deep decompiled code analysis |
 | 17 | `input_validation.sh` | Input validation testing across discovered APIs |
 | 18 | `dastforge.sh` | SQLi + XSS/SSRF/CMDi/IDOR testing + vulnerability chaining |
+| 19 | `rasp_bypass.sh` | Comprehensive RASP bypass — fingerprint, inventory vectors, deploy Frida/Magisk bypass, verify |
 
 ---
 
@@ -261,7 +264,8 @@ genymotion-pipeline/
 │   ├── 15_cleanup.sh         # Device cleanup
 │   ├── 16_code_analysis.sh   # Deep code analysis
 │   ├── 17_input_validation.sh # Input validation
-│   └── 18_dastforge.sh       # SQLi/XSS/SSRF/CMDi/IDOR + chaining
+│   ├── 18_dastforge.sh       # SQLi/XSS/SSRF/CMDi/IDOR + chaining
+│   └── 19_rasp_bypass.sh     # RASP fingerprint + bypass
 ├── lib/
 │   ├── common.sh             # Shared helpers
 │   └── findings.sh           # Findings DB
