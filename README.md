@@ -162,13 +162,16 @@ the driver. Verified: KVM boot ~10s, Android 11 rooted, Frida/objection reachabl
 ## Quick Start
 
 ```bash
-# 1. Setup
+# 1. Setup dependencies + custom emulator (installs Android SDK, BOTH system images,
+#    and creates the viny-motion + viny-motion-play AVDs) on any fresh machine
 ./setup.sh
+./extras/setup-custom-emulator.sh
 
 # 2. Edit config
 vi config/target.yaml
 
-# 3. Run full pipeline
+# 3. Boot the custom emulator + run the full pipeline
+./extras/viny-motion-emu.sh start
 ./run.sh all
 
 # 4. Run specific phase
