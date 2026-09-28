@@ -70,7 +70,7 @@ run_one() {
     err "LAYA gate blocked phase $ph"
     return 1
   fi
-  [ "$RAG" = 1 ] && "$PIPELINE_ROOT/extras/skill_dispatch.sh" "$ph" 2>/dev/null || true
+  "$PIPELINE_ROOT/extras/skill_dispatch.sh" "$ph" 2>/dev/null || true
   bash "$PIPELINE_ROOT/phases/$ph.sh"
   echo
 }
