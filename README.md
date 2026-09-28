@@ -23,10 +23,16 @@ flowchart TD
         A3[Secrets & native lib analysis]
     end
 
-    subgraph B["ENVIRONMENT — phases 02, 06"]
+    subgraph B["ENVIRONMENT & RUNTIME — phases 02, 06"]
         B1[Genymotion emulator]
         B2[Install APK]
         B3[Burp proxy + CA cert install]
+        B4[Launch APK on emulator screen]
+        B5[App runs — every request captured live in Burp HTTP history]
+        B1 --> B2
+        B2 --> B4
+        B3 --> B5
+        B4 --> B5
     end
 
     subgraph C["DYNAMIC — phases 03–05"]
@@ -55,6 +61,10 @@ flowchart TD
 
     A --> B --> C --> D --> E --> F
 ```
+
+> **On-screen runtime:** once the APK is installed (phase 02) the app is launched and driven
+> on the emulator screen while Burp captures the live traffic (phase 06) — this is where
+> API endpoints, auth flows and hidden requests are discovered for later phases.
 
 ---
 
