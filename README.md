@@ -136,6 +136,27 @@ flowchart TD
 
 ---
 
+## Custom Emulator (viny-motion-emu)
+
+The pipeline runs on a **custom Android emulator driver** (`extras/viny-motion-emu.sh`) built on
+the open-source AOSP/QEMU emulator — no Genymotion software, images, or subscriptions.
+
+```bash
+./extras/viny-motion-emu.sh start              # boot AVD headless (KVM)
+./extras/viny-motion-emu.sh status             # device + boot state
+./extras/viny-motion-emu.sh screenshot out.png # capture screen
+./extras/viny-motion-emu.sh snap save <name>   # snapshot
+./extras/viny-motion-emu.sh install app.apk    # install APK
+./extras/viny-motion-emu.sh proxy 127.0.0.1:8080  # route via Burp
+./extras/viny-motion-emu.sh root               # adb root (userdebug image)
+```
+
+Setup once (Android SDK cmdline-tools + emulator + Android 11 x86_64 image), then the
+pipeline's `02_setup_viny_motion` phase boots the device and every operation goes through
+the driver. Verified: KVM boot ~10s, Android 11 rooted, Frida/objection reachable.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -167,7 +188,7 @@ required tool or config value is missing, the run aborts with a list of what to 
 
 | Tool | Purpose | Install |
 |------|---------|---------|
-| viny-motion | Android emulator | `~/genymotion-3.10.0-linux_x64.run` |
+| AOSP/QEMU emulator | Android emulator — custom `viny-motion-emu` driver (Genymotion-independent) | Android SDK cmdline-tools: `sdkmanager "emulator" "platform-tools" "system-images;android-30;google_apis;x86_64"` |
 | adb | Android Debug Bridge | `apt install android-tools-adb` |
 | drozer | Android security testing | `pip install drozer` |
 | objection | Frida-based runtime pentesting | `pip install objection` |
@@ -249,7 +270,7 @@ apk:
 api_hosts: ""                        # optional: restrict API testing to these hosts (comma-separated)
 
 viny-motion:
-  device_name: "pipeline-test"        # viny-motion device name
+  device_name: "emulator-5554"        # viny-motion AVD adb serial
   android_version: "11.0"            # Android version
   resolution: "1080x1920"            # Screen resolution
   memory: 4096                        # RAM in MB

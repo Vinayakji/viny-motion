@@ -14,14 +14,14 @@ cd "$RUN_DIR" || exit 1
 info "Setting up viny-motion device: $DEVICE"
 
 # ---- 1. Start viny-motion ----
-info "[step-1/8] Checking viny-motion installation"
-if [ -x "$HOME/genymotion/genymotion" ] || [ -x "$HOME/genymotion/player" ]; then
-  info "  Found viny-motion binary; starting device '$DEVICE'"
+info "[step-1/8] Checking viny-motion emulator installation"
+if [ -x "$HOME/android-sdk/emulator/emulator" ] && [ -x "$HOME/android-sdk/platform-tools/adb" ]; then
+  info "  Found AOSP/QEMU emulator; starting device '$DEVICE'"
   viny_motion_start "$DEVICE"
-  ok "  viny-motion start command issued"
+  ok "  viny-motion emulator start issued"
 else
-  warn "  viny-motion not found at ~/genymotion/genymotion or ~/genymotion/player"
-  warn "  Ensure viny-motion is installed; continuing with existing device"
+  warn "  AOSP/QEMU emulator not found at ~/android-sdk"
+  warn "  Install Android SDK cmdline-tools + emulator; continuing with existing device"
 fi
 
 # ---- 2. Wait for device ----

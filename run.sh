@@ -94,10 +94,10 @@ check() {
   for t in "${OPTIONAL_TOOLS[@]}"; do
     command -v "$t" >/dev/null 2>&1 && echo "  OK   $t" || echo "  --   $t"
   done
-  if [ -x "$HOME/genymotion/genymotion" ] || [ -x "$HOME/genymotion/player" ]; then
-    echo "genymotion  : OK"
+  if [ -x "$HOME/android-sdk/emulator/emulator" ] && [ -x "$HOME/android-sdk/platform-tools/adb" ]; then
+    echo "emulator    : OK (AOSP/QEMU via viny-motion-emu)"
   else
-    echo "genymotion  : MISS"
+    echo "emulator    : MISS (install Android SDK emulator)"
     rc=1
   fi
   if [ "$rc" -eq 0 ]; then

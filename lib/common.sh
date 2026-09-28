@@ -95,19 +95,14 @@ adb_launch() {
 # ---- viny-motion helpers ----
 viny_motion_start() {
   local device="$1"
-  info "Starting viny-motion device: $device"
-  "$HOME/genymotion/genymotion" --vm-start "$device" 2>/dev/null || \
-  "$HOME/genymotion/player" --vm-start "$device" 2>/dev/null || \
-  warn "Could not start viny-motion device (is it installed?)"
-  sleep 10
+  info "Starting viny-motion emulator (adb serial: $device)"
+  "$PIPELINE_ROOT/extras/viny-motion-emu.sh" start
 }
 
 viny_motion_stop() {
   local device="$1"
-  info "Stopping viny-motion device: $device"
-  "$HOME/genymotion/genymotion" --vm-stop "$device" 2>/dev/null || \
-  "$HOME/genymotion/player" --vm-stop "$device" 2>/dev/null || \
-  warn "Could not stop viny-motion device"
+  info "Stopping viny-motion emulator"
+  "$PIPELINE_ROOT/extras/viny-motion-emu.sh" stop
 }
 
 # ---- proxy setup ----
