@@ -17,10 +17,13 @@ flowchart TD
     CHECK -- "missing" --> FIX[Install missing tools / fix config]
     CHECK -- "ready" --> A
 
-    subgraph A["STATIC ANALYSIS — phase 01"]
-        A1[jadx / apktool / aapt decompile]
-        A2[AndroidManifest audit]
-        A3[Secrets & native lib analysis]
+    subgraph A["SAST — STATIC ANALYSIS — phases 01, 16"]
+        A1[Decompile — jadx / apktool / aapt]
+        A1 --> A2[Manifest audit — permissions, exported components, deep links]
+        A1 --> A3[Secrets scan — Firebase, AWS, Stripe, GitHub tokens]
+        A1 --> A4[Native libs — strings / symbols]
+        A1 --> A5[Deep code scan — RCE sinks, crypto, storage, logging]
+        A5 --> A6[Semgrep — MASTG-aligned rules]
     end
 
     subgraph B["ENVIRONMENT & RUNTIME — phases 02, 06"]
@@ -65,6 +68,13 @@ flowchart TD
 > **On-screen runtime:** once the APK is installed (phase 02) the app is launched and driven
 > on the emulator screen while Burp captures the live traffic (phase 06) — this is where
 > API endpoints, auth flows and hidden requests are discovered for later phases.
+>
+> **SAST approaches:** the decompiled source is audited across several tracks — manifest
+> hardening (permissions / exported components / deep links), hardcoded secrets (Firebase,
+> AWS, Stripe, GitHub tokens), native-library exposure, and deep code scans for RCE sinks
+> (`Runtime.exec`, deserialization), weak crypto (DES/MD5/ECB), insecure storage
+> (SharedPreferences/SQLite), logging leaks and debug guards — plus a Semgrep pass with
+> MASTG-aligned rules.
 
 ---
 
