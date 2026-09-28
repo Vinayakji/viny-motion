@@ -123,6 +123,12 @@ grep -rhoE '[a-zA-Z0-9]{32,}' "$JADX_DIR" 2>/dev/null | head -100 >> "$SECRETS"
 GENERIC_COUNT=$(wc -l < "$SECRETS" 2>/dev/null || echo 0)
 info "  Generic potential secrets: $GENERIC_COUNT"
 
+info "  Scanning for hardcoded credential keywords (gitleaks-style, 100+ patterns)"
+grep -rhoP -f "$PIPELINE_ROOT/config/secret-keyword-regex.txt" "$JADX_DIR" 2>/dev/null | sort -u > "$STATIC_DIR/credential_keywords.txt"
+KEYWORD_COUNT=$(wc -l < "$STATIC_DIR/credential_keywords.txt" 2>/dev/null || echo 0)
+info "  Credential-keyword assignments found: $KEYWORD_COUNT"
+[ "$KEYWORD_COUNT" -gt 0 ] && { warn "  $KEYWORD_COUNT hardcoded credential assignments"; fadd "$KEYWORD_COUNT hardcoded credential assignments (gitleaks patterns)" HIGH PROBABLE CWE-798 "A07:2021" --component "source" --tags "secrets,sast" --remediation "Remove hardcoded secrets; use a secrets manager / env vars" "$STATIC_DIR/credential_keywords.txt"; } || ok "  No credential-keyword assignments"
+
 info "  Scanning for hardcoded URLs"
 grep -rhoE 'https?://[a-zA-Z0-9./_-]+' "$JADX_DIR" 2>/dev/null | sort -u > "$STATIC_DIR/urls.txt"
 URL_COUNT=$(wc -l < "$STATIC_DIR/urls.txt" 2>/dev/null || echo 0)

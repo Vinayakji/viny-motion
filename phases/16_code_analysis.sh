@@ -112,6 +112,12 @@ SECRET_COUNT=$(wc -l < "$CODE_DIR/hardcoded_strings.txt" 2>/dev/null || echo 0)
 info "  Hardcoded secret strings: $SECRET_COUNT"
 [ "$SECRET_COUNT" -gt 0 ] && { warn "  $SECRET_COUNT hardcoded secret strings found"; fadd "$SECRET_COUNT hardcoded secret strings" HIGH CERTAIN CWE-798 "A07:2021" "$CODE_DIR/hardcoded_strings.txt"; }
 
+info "[step-C6/6] Scanning for hardcoded credential keywords (gitleaks-style, 100+ patterns)"
+grep -rhoP -f "$PIPELINE_ROOT/config/secret-keyword-regex.txt" "$JADX_DIR/sources/" 2>/dev/null | sort -u > "$CODE_DIR/credential_keywords.txt"
+CRED_COUNT=$(wc -l < "$CODE_DIR/credential_keywords.txt" 2>/dev/null || echo 0)
+info "  Credential-keyword assignments: $CRED_COUNT"
+[ "$CRED_COUNT" -gt 0 ] && { warn "  $CRED_COUNT hardcoded credential assignments"; fadd "$CRED_COUNT hardcoded credential assignments (gitleaks patterns)" HIGH PROBABLE CWE-798 "A07:2021" --component "source" --tags "secrets,sast" --remediation "Remove hardcoded secrets; use a secrets manager / env vars" "$CODE_DIR/credential_keywords.txt"; }
+
 # ============================================================
 # D. Logging & Debug Analysis
 # ============================================================
