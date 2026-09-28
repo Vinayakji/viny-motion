@@ -247,6 +247,7 @@ genymotion-pipeline/
 │   └── findings.sh           # Findings DB
 ├── extras/
 │   ├── burp-mcp/             # Burp Suite MCP server (proxy, Repeater, Scanner)
+│   ├── viny-motion-emu.sh    # Custom AOSP/QEMU emulator driver
 │   ├── frida-scripts/        # Reusable Frida hooks
 │   ├── objection-scripts/    # Reusable objection commands
 │   ├── semgrep/              # MASTG-aligned SAST rules
