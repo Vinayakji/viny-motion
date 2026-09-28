@@ -8,6 +8,8 @@ apk:
   version: "4.28"
   version_code: "128"
 
+api_hosts: ""
+
 genymotion:
   device_name: "127.0.0.1:6555"
   android_version: "16"

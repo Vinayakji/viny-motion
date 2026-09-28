@@ -113,15 +113,26 @@ flowchart TD
 | Phase | Script | Description |
 |-------|--------|-------------|
 | 00 | `acquire.sh` | Download APK from Play Store / APKPure / APKMirror |
-| 01 | `static.sh` | jadx decompile, manifest audit, secrets extraction, native lib analysis |
+| 01 | `static.sh` | jadx decompile, manifest audit, secrets, native libs |
 | 02 | `setup_genymotion.sh` | Create/start Genymotion device, install APK |
 | 03 | `dynamic_drozer.sh` | Drozer enumeration + exploitation modules |
+| 03b | `dynamic_drozer_mcp.sh` | Drozer via Genymotion MCP tools (when available) |
 | 04 | `dynamic_objection.sh` | Frida-based runtime hooking (SSL pinning, root bypass, keychain) |
 | 05 | `frida_hooks.sh` | Custom Frida scripts (method tracing, memory search, SSL bypass) |
 | 06 | `traffic_capture.sh` | Burp proxy setup, traffic logging, API endpoint extraction |
+| 07 | `deep_links.sh` | Deep link + intent injection testing |
 | 07 | `storage_dump.sh` | Extract SharedPreferences, SQLite, files, keychain |
 | 08 | `findings_report.sh` | Aggregate findings, generate report |
-| 18 | `dastforge.sh` | SQLi + XSS/SSRF/CMDi/IDOR testing across discovered APIs + vulnerability chaining |
+| 09 | `mobsf_dast.sh` | MobSF scan + DAST endpoint discovery |
+| 10 | `backup_extract.sh` | ADB backup extraction + analysis |
+| 11 | `webview_exploit.sh` | WebView vulnerability exploitation |
+| 12 | `pending_intent.sh` | PendingIntent abuse + intent redirection |
+| 13 | `resilience.sh` | Anti-debug, root/emulator detection, integrity checks |
+| 14 | `crypto_audit.sh` | Cryptographic implementation audit |
+| 15 | `cleanup.sh` | Uninstall app, clear proxy, remove temp files |
+| 16 | `code_analysis.sh` | Deep decompiled code analysis |
+| 17 | `input_validation.sh` | Input validation testing across discovered APIs |
+| 18 | `dastforge.sh` | SQLi + XSS/SSRF/CMDi/IDOR testing + vulnerability chaining |
 
 ---
 
@@ -193,11 +204,23 @@ genymotion-pipeline/
 │   ├── 01_static.sh          # Static analysis (jadx, secrets, manifest)
 │   ├── 02_setup_genymotion.sh # Emulator setup + APK install
 │   ├── 03_dynamic_drozer.sh  # Drozer modules
+│   ├── 03b_dynamic_drozer_mcp.sh # Drozer via MCP tools
 │   ├── 04_dynamic_objection.sh # Objection/Frida hooks
 │   ├── 05_frida_hooks.sh     # Custom Frida scripts
 │   ├── 06_traffic_capture.sh # Burp proxy + traffic logging
+│   ├── 07_deep_links.sh      # Deep link / intent injection
 │   ├── 07_storage_dump.sh    # Local storage extraction
-│   └── 08_findings_report.sh # Report generation
+│   ├── 08_findings_report.sh # Report generation
+│   ├── 09_mobsf_dast.sh      # MobSF + DAST
+│   ├── 10_backup_extract.sh  # ADB backup analysis
+│   ├── 11_webview_exploit.sh # WebView exploitation
+│   ├── 12_pending_intent.sh  # PendingIntent abuse
+│   ├── 13_resilience.sh      # Anti-debug / root / emulator
+│   ├── 14_crypto_audit.sh    # Crypto audit
+│   ├── 15_cleanup.sh         # Device cleanup
+│   ├── 16_code_analysis.sh   # Deep code analysis
+│   ├── 17_input_validation.sh # Input validation
+│   └── 18_dastforge.sh       # SQLi/XSS/SSRF/CMDi/IDOR + chaining
 ├── lib/
 │   ├── common.sh             # Shared helpers
 │   └── findings.sh           # Findings DB
@@ -222,6 +245,8 @@ apk:
   path: "/path/to/app.apk"           # Local APK path
   package_name: "com.example.app"     # Android package name
   download_url: ""                    # Or provide download URL
+
+api_hosts: ""                        # optional: restrict API testing to these hosts (comma-separated)
 
 genymotion:
   device_name: "pipeline-test"        # Genymotion device name
@@ -265,7 +290,6 @@ auth:
 
 ```bash
 ./run.sh all                    # Run all phases
-./run.sh --skip-static all      # Skip static analysis
 ```
 
 ### Individual Phases
@@ -274,8 +298,8 @@ auth:
 ./run.sh 00_acquire             # Download APK
 ./run.sh 01_static              # Static analysis
 ./run.sh 02_setup_genymotion    # Setup emulator
-./run.sh 04_dynamic_objection   # Run objection hooks
 ./run.sh 06_traffic_capture     # Capture traffic
+./run.sh 18_dastforge           # SQLi / XSS / SSRF / CMDi / IDOR + chaining
 ```
 
 ### RAG-Enhanced (if configured)
