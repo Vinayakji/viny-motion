@@ -6,6 +6,58 @@ Automated mobile application security testing pipeline using Genymotion emulator
 
 ---
 
+## Pipeline Overview
+
+```mermaid
+flowchart TD
+    APK[Target APK] --> RUN[./run.sh all]
+    RUN --> GATE{Authorization Gate<br/>lib/scope_gate.sh}
+    GATE -- "no written scope" --> REFUSE[REFUSED — will not run]
+    GATE -- "authorized" --> CHECK{Pre-flight Check<br/>required tools + config/target.yaml}
+    CHECK -- "missing" --> FIX[Install missing tools / fix config]
+    CHECK -- "ready" --> A
+
+    subgraph A["STATIC ANALYSIS — phase 01"]
+        A1[jadx / apktool / aapt decompile]
+        A2[AndroidManifest audit]
+        A3[Secrets & native lib analysis]
+    end
+
+    subgraph B["ENVIRONMENT — phases 02, 06"]
+        B1[Genymotion emulator]
+        B2[Install APK]
+        B3[Burp proxy + CA cert install]
+    end
+
+    subgraph C["DYNAMIC — phases 03–05"]
+        C1[drozer — IPC / exploit modules]
+        C2[objection — runtime hooking]
+        C3[Frida scripts — SSL / root bypass]
+    end
+
+    subgraph D["DATA & COMPONENTS — phases 07, 10–14"]
+        D1[Storage dump — SQLite / prefs]
+        D2[Deep links & WebView]
+        D3[Backup / crypto / resilience]
+    end
+
+    subgraph E["ADVANCED — phases 09, 16, 17"]
+        E1[MobSF DAST]
+        E2[Code analysis]
+        E3[Input validation]
+    end
+
+    subgraph F["OUTPUT — phase 08"]
+        F1[findings.json — severity + CVSS]
+        F2[ASSESS findings report]
+        F3[VAPT handoff]
+    end
+
+    A --> B --> C --> D --> E --> F
+```
+
+---
+
 ## Pipeline Phases
 
 | Phase | Script | Description |
