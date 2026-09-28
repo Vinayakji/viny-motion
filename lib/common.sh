@@ -36,6 +36,40 @@ warn()  { log "WARN  $*"; }
 ok()    { log "OK    $*"; }
 err()   { log "ERROR $*"; }
 
+# ---- prerequisites ----
+# Core tools the pipeline REQUIRES before any phase runs (enforced by run.sh check).
+REQUIRED_TOOLS=(
+  adb drozer objection frida frida-ps frida-trace
+  jadx apktool aapt jq python3 curl
+)
+
+# Optional tools: enhance specific phases; missing ones are warned, not fatal.
+OPTIONAL_TOOLS=(
+  nmap whatweb ffuf gobuster dirb nuclei httpx subfinder amass sqlmap
+)
+
+# Verify every required tool is on PATH. Prints missing ones, returns non-zero.
+require_tools() {
+  local missing=() t
+  for t in "${REQUIRED_TOOLS[@]}"; do
+    command -v "$t" >/dev/null 2>&1 || missing+=("$t")
+  done
+  if [ ${#missing[@]} -gt 0 ]; then
+    err "Missing required tools: ${missing[*]}"
+    return 1
+  fi
+  return 0
+}
+
+# Verify required config keys are set in config/target.yaml. Returns non-zero if any are empty.
+require_config() {
+  local rc=0 key
+  for key in "apk path" "apk package_name" "genymotion device_name" "proxy host" "proxy port" "target authorization_ref"; do
+    [ -n "$(tget $key)" ] || { err "config missing: $key  (set it in config/target.yaml)"; rc=1; }
+  done
+  return $rc
+}
+
 # ---- adb helpers ----
 adb_shell() {
   adb shell "$@" 2>/dev/null

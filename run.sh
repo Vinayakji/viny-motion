@@ -76,7 +76,9 @@ run_one() {
 }
 
 check() {
-  require_authorization || return 1
+  local rc=0
+  require_authorization || rc=1
+  require_config || rc=1
   echo "== PRE-FLIGHT =="
   echo "apk         : $(tget apk path || echo NOT SET)"
   echo "package     : $(tget apk package_name || echo NOT SET)"
@@ -84,13 +86,26 @@ check() {
   echo "proxy       : $(tget proxy host):$(tget proxy port)"
   echo "run dir     : $RUN_DIR"
   echo "phases      : ${#PHASES[@]} total"
-  echo "jev         : $([ -f "$HOME/.config/opencode/jev/jev_server.py" ] && echo READY || echo MISSING)"
-  echo "new modules : deep_links, objection_helpers"
-  echo "tools       :"
-  for t in adb drozer objection frida jadx frida-ps frida-trace jq; do
-    command -v "$t" >/dev/null 2>&1 && echo "  OK $t" || echo "  MISS $t"
+  echo "required tools:"
+  for t in "${REQUIRED_TOOLS[@]}"; do
+    if command -v "$t" >/dev/null 2>&1; then echo "  OK   $t"; else echo "  MISS $t"; rc=1; fi
   done
-  echo "genymotion  : $([ -x "$HOME/genymotion/genymotion" ] || [ -x "$HOME/genymotion/player" ] && echo OK || echo MISS)"
+  echo "optional tools (warn only):"
+  for t in "${OPTIONAL_TOOLS[@]}"; do
+    command -v "$t" >/dev/null 2>&1 && echo "  OK   $t" || echo "  --   $t"
+  done
+  if [ -x "$HOME/genymotion/genymotion" ] || [ -x "$HOME/genymotion/player" ]; then
+    echo "genymotion  : OK"
+  else
+    echo "genymotion  : MISS"
+    rc=1
+  fi
+  if [ "$rc" -eq 0 ]; then
+    ok "pre-flight passed — environment ready"
+  else
+    warn "pre-flight FAILED — fix the issues above before running"
+  fi
+  return $rc
 }
 
 # VAPT handoff - extract findings for web testing
@@ -178,7 +193,7 @@ case "${1:-all}" in
     vapt_handoff
     ;;
   *)
-    require_authorization || exit 1
+    check || exit 1
     for ph in "$@"; do
       case "$ph" in
         vapt_handoff) vapt_handoff ;;

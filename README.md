@@ -43,17 +43,37 @@ vi config/target.yaml
 
 ## Prerequisites
 
+The pipeline **validates prerequisites before running anything**. `./run.sh check`
+is enforced automatically before `all` and before any individual phase — if a
+required tool or config value is missing, the run aborts with a list of what to fix.
+
+> Run `./run.sh check` any time to see exactly what is missing before starting.
+
+### Required (enforced — run aborts if missing)
+
 | Tool | Purpose | Install |
 |------|---------|---------|
 | Genymotion | Android emulator | `~/genymotion-3.10.0-linux_x64.run` |
 | adb | Android Debug Bridge | `apt install android-tools-adb` |
 | drozer | Android security testing | `pip install drozer` |
-| objection | Frida-based pentesting | `pip install objection` |
-| Frida | Dynamic instrumentation | `pip install frida-tools` |
+| objection | Frida-based runtime pentesting | `pip install objection` |
+| Frida / frida-ps / frida-trace | Dynamic instrumentation | `pip install frida-tools` |
 | jadx | APK decompilation | `apt install jadx` |
-| MobSF | Static analysis (optional) | Docker: `docker run -p 8000:8000 opensecurity/mobsf` |
-| Burp Suite | Traffic interception | `~/BurpSuitePro/BurpSuite` |
-| Playwright | Browser automation (optional) | `npm install -g playwright` |
+| apktool | APK resource/smali decode | `apt install apktool` |
+| aapt | APK metadata | `apt install aapt` |
+| jq | JSON processing | `apt install jq` |
+| python3 / curl | Runtime + HTTP | system |
+
+Config keys required in `config/target.yaml`: `apk.path`, `apk.package_name`,
+`genymotion.device_name`, `proxy.host`, `proxy.port`, `target.authorization_ref`.
+
+### Optional (phases degrade gracefully — warned, not fatal)
+
+| Tool | Purpose |
+|------|---------|
+| nmap, whatweb, ffuf, gobuster, dirb, nuclei, httpx, subfinder, amass, sqlmap | network / recon phases |
+| MobSF | `09_mobsf_dast` (Docker: `docker run -p 8000:8000 opensecurity/mobsf`) |
+| Burp Suite | traffic interception (`~/BurpSuitePro/BurpSuite`) |
 
 ---
 
