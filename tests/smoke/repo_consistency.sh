@@ -14,7 +14,9 @@ mapfile -t phases < <(awk '
   /PHASES=\(/ {in_arr=1; next}
   in_arr && /\)/ {in_arr=0; next}
   in_arr {
-    for (i=1; i<=NF; i++) print $i
+    for (i=1; i<=NF; i++) {
+      if ($i ~ /^[0-9]{2}[a-z]?_[a-z0-9_]+$/) print $i
+    }
   }
 ' run.sh)
 

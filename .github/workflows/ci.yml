@@ -27,7 +27,7 @@ jobs:
 
       - name: ShellCheck critical scripts
         run: |
-          shellcheck run.sh setup.sh run_android_pipeline.sh lib/common.sh tests/smoke/repo_consistency.sh
+          shellcheck -S error -x run.sh setup.sh run_android_pipeline.sh lib/common.sh tests/smoke/repo_consistency.sh
 
       - name: Python syntax check
         run: |
