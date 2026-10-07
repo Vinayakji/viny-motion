@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   bash-syntax-and-smoke:
     runs-on: ubuntu-latest
