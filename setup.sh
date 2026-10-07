@@ -22,20 +22,23 @@ for cmd in bash curl jq python3 adb; do
   command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd (not found)"
 done
 
-# Check viny-motion
-if [ -d "$HOME/genymotion" ]; then
-  ok "viny-motion ($HOME/genymotion)"
+# Check custom emulator driver + Android SDK tools
+if [ -x "$ROOT/extras/viny-motion-emu.sh" ]; then
+  ok "custom emulator driver (extras/viny-motion-emu.sh)"
 else
-  fail "viny-motion not found at ~/genymotion"
+  fail "custom emulator driver missing: extras/viny-motion-emu.sh"
 fi
 
-# Check viny-motion binary
-if [ -x "$HOME/genymotion/genymotion" ]; then
-  ok "genymotion binary"
-elif [ -x "$HOME/genymotion/player" ]; then
-  ok "genymotion player"
+if [ -x "$HOME/android-sdk/emulator/emulator" ]; then
+  ok "Android SDK emulator"
 else
-  warn "genymotion binary not found (may need installation)"
+  warn "Android SDK emulator not found (run ./extras/setup-custom-emulator.sh)"
+fi
+
+if [ -x "$HOME/android-sdk/platform-tools/adb" ] || command -v adb >/dev/null 2>&1; then
+  ok "adb"
+else
+  warn "adb not found (install Android SDK platform-tools)"
 fi
 
 echo ""
@@ -88,6 +91,10 @@ if [ ! -f "$CONFIG" ]; then
 # viny-motion Pipeline - target config
 # ============================================================
 
+target:
+  name: "example-app"
+  authorization_ref: "Authorized engagement - written scope signed"
+
 apk:
   path: ""                              # Local APK path
   package_name: ""                      # Android package name (e.g. com.example.app)
@@ -131,7 +138,7 @@ echo "=========================================="
 echo ""
 echo "Next steps:"
 echo "  1. Edit config/target.yaml with your APK and device settings"
-echo "  2. Ensure viny-motion is installed: ~/genymotion/genymotion"
+echo "  2. Install emulator dependencies: ./extras/setup-custom-emulator.sh"
 echo "  3. Run: ./run.sh check"
 echo "  4. Run: ./run.sh all"
 echo ""

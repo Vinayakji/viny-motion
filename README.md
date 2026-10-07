@@ -114,28 +114,28 @@ flowchart TD
 
 | Phase | Script | Description |
 |-------|--------|-------------|
-| 00 | `acquire.sh` | Download APK from Play Store / APKPure / APKMirror |
-| 01 | `static.sh` | jadx decompile, manifest audit, secrets, native libs |
-| 02 | `setup_viny_motion.sh` | Create/start viny-motion device, install APK |
-| 03 | `dynamic_drozer.sh` | Drozer enumeration + exploitation modules |
-| 03b | `dynamic_drozer_mcp.sh` | Drozer via viny-motion MCP tools (when available) |
-| 04 | `dynamic_objection.sh` | Frida-based runtime hooking (SSL pinning, root bypass, keychain) |
-| 05 | `frida_hooks.sh` | Custom Frida scripts (method tracing, memory search, SSL bypass) |
-| 06 | `traffic_capture.sh` | Burp proxy setup, traffic logging, API endpoint extraction |
-| 07 | `deep_links.sh` | Deep link + intent injection testing |
-| 07 | `storage_dump.sh` | Extract SharedPreferences, SQLite, files, keychain |
-| 08 | `findings_report.sh` | Aggregate findings, generate report |
-| 09 | `mobsf_dast.sh` | MobSF scan + DAST endpoint discovery |
-| 10 | `backup_extract.sh` | ADB backup extraction + analysis |
-| 11 | `webview_exploit.sh` | WebView vulnerability exploitation |
-| 12 | `pending_intent.sh` | PendingIntent abuse + intent redirection |
-| 13 | `resilience.sh` | Anti-debug, root/emulator detection, integrity checks |
-| 14 | `crypto_audit.sh` | Cryptographic implementation audit |
-| 15 | `cleanup.sh` | Uninstall app, clear proxy, remove temp files |
-| 16 | `code_analysis.sh` | Deep decompiled code analysis |
-| 17 | `input_validation.sh` | Input validation testing across discovered APIs |
-| 18 | `dastforge.sh` | Context-aware DAST (smart): 11 vuln classes — SQLi, XSS, SSRF, CMDi, IDOR, SSTI, LFI, Open Redirect, NoSQLi, JWT, Mass Assignment — param-classified with pre-probe gating + 2-signal confirmation; `--deep` for brute-force |
-| 19 | `rasp_bypass.sh` | Comprehensive RASP bypass — fingerprint, inventory vectors, deploy Frida/Magisk bypass, verify |
+| 00 | `00_acquire.sh` | Download APK from Play Store / APKPure / APKMirror |
+| 01 | `01_static.sh` | jadx decompile, manifest audit, secrets, native libs |
+| 02 | `02_setup_viny_motion.sh` | Create/start viny-motion device, install APK |
+| 03 | `03_dynamic_drozer.sh` | Drozer enumeration + exploitation modules |
+| 03b | `03b_dynamic_drozer_mcp.sh` | Drozer via viny-motion MCP tools (when available) |
+| 04 | `04_dynamic_objection.sh` | Frida-based runtime hooking (SSL pinning, root bypass, keychain) |
+| 05 | `05_frida_hooks.sh` | Custom Frida scripts (method tracing, memory search, SSL bypass) |
+| 06 | `06_traffic_capture.sh` | Burp proxy setup, traffic logging, API endpoint extraction |
+| 07 | `07_deep_links.sh` | Deep link + intent injection testing |
+| 07 | `07_storage_dump.sh` | Extract SharedPreferences, SQLite, files, keychain |
+| 08 | `08_findings_report.sh` | Aggregate findings, generate report |
+| 09 | `09_mobsf_dast.sh` | MobSF scan + DAST endpoint discovery |
+| 10 | `10_backup_extract.sh` | ADB backup extraction + analysis |
+| 11 | `11_webview_exploit.sh` | WebView vulnerability exploitation |
+| 12 | `12_pending_intent.sh` | PendingIntent abuse + intent redirection |
+| 13 | `13_resilience.sh` | Anti-debug, root/emulator detection, integrity checks |
+| 14 | `14_crypto_audit.sh` | Cryptographic implementation audit |
+| 15 | `15_cleanup.sh` | Uninstall app, clear proxy, remove temp files |
+| 16 | `16_code_analysis.sh` | Deep decompiled code analysis |
+| 17 | `17_input_validation.sh` | Input validation testing across discovered APIs |
+| 18 | `18_dastforge.sh` | Context-aware DAST (smart): 11 vuln classes — SQLi, XSS, SSRF, CMDi, IDOR, SSTI, LFI, Open Redirect, NoSQLi, JWT, Mass Assignment — param-classified with pre-probe gating + 2-signal confirmation; `--deep` for brute-force |
+| 19 | `19_rasp_bypass.sh` | Comprehensive RASP bypass — fingerprint, inventory vectors, deploy Frida/Magisk bypass, verify |
 
 ---
 
@@ -239,7 +239,7 @@ Config keys required in `config/target.yaml`: `apk.path`, `apk.package_name`,
 ## Directory Structure
 
 ```
-genymotion-pipeline/
+viny-motion/
 ├── run.sh                    # Master runner
 ├── setup.sh                  # Dependency installer
 ├── config/
@@ -270,10 +270,10 @@ genymotion-pipeline/
 ├── lib/
 │   ├── common.sh             # Shared helpers
 │   └── findings.sh           # Findings DB
+├── secrets_scanner.py         # Master SAST secrets scanner (38 patterns)
 ├── extras/
 │   ├── burp-mcp/             # Burp Suite MCP server (proxy, Repeater, Scanner)
 │   ├── viny-motion-emu.sh    # Custom AOSP/QEMU emulator driver
-│   ├── secrets_scanner.py    # Master SAST secrets scanner (38 patterns)
 │   ├── frida-scripts/        # Reusable Frida hooks
 │   ├── objection-scripts/    # Reusable objection commands
 │   ├── semgrep/              # MASTG-aligned SAST rules
@@ -289,6 +289,10 @@ genymotion-pipeline/
 ### `config/target.yaml`
 
 ```yaml
+target:
+  name: "example-app"
+  authorization_ref: "Authorized engagement - written scope signed"
+
 apk:
   path: "/path/to/app.apk"           # Local APK path
   package_name: "com.example.app"     # Android package name
