@@ -22,20 +22,12 @@ for cmd in bash curl jq python3 adb; do
   command -v "$cmd" >/dev/null 2>&1 && ok "$cmd" || fail "$cmd (not found)"
 done
 
-# Check viny-motion
-if [ -d "$HOME/genymotion" ]; then
-  ok "viny-motion ($HOME/genymotion)"
+# Check custom emulator prerequisites (AOSP/QEMU via Android SDK)
+if [ -x "$HOME/android-sdk/emulator/emulator" ] && [ -x "$HOME/android-sdk/platform-tools/adb" ]; then
+  ok "AOSP/QEMU emulator binaries (~/android-sdk)"
 else
-  fail "viny-motion not found at ~/genymotion"
-fi
-
-# Check viny-motion binary
-if [ -x "$HOME/genymotion/genymotion" ]; then
-  ok "genymotion binary"
-elif [ -x "$HOME/genymotion/player" ]; then
-  ok "genymotion player"
-else
-  warn "genymotion binary not found (may need installation)"
+  warn "AOSP/QEMU emulator binaries not found at ~/android-sdk"
+  warn "Run: ./extras/setup-custom-emulator.sh"
 fi
 
 echo ""
@@ -88,6 +80,10 @@ if [ ! -f "$CONFIG" ]; then
 # viny-motion Pipeline - target config
 # ============================================================
 
+target:
+  name: ""
+  authorization_ref: "Authorized security assessment - written scope confirmed"
+
 apk:
   path: ""                              # Local APK path
   package_name: ""                      # Android package name (e.g. com.example.app)
@@ -131,7 +127,7 @@ echo "=========================================="
 echo ""
 echo "Next steps:"
 echo "  1. Edit config/target.yaml with your APK and device settings"
-echo "  2. Ensure viny-motion is installed: ~/genymotion/genymotion"
+echo "  2. Install custom emulator toolchain: ./extras/setup-custom-emulator.sh"
 echo "  3. Run: ./run.sh check"
 echo "  4. Run: ./run.sh all"
 echo ""
