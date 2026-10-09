@@ -4,7 +4,6 @@
 set -uo pipefail
 PIPELINE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 source "$PIPELINE_ROOT/lib/common.sh"
-source "$PIPELINE_ROOT/lib/skill_dispatcher.sh"
 source "$PIPELINE_ROOT/lib/findings.sh"
 source "$PIPELINE_ROOT/lib/objection_helpers.sh"
 

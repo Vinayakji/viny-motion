@@ -16,6 +16,10 @@ source "$PIPELINE_ROOT/lib/scope_gate.sh"
 source "$PIPELINE_ROOT/lib/retest.sh"
 source "$HOME/laya_orchestrator/laya_hook.sh" 2>/dev/null || true
 
+# LAYA hooks are optional; use no-op defaults when the external hook file is absent.
+type laya_health_check >/dev/null 2>&1 || laya_health_check() { return 0; }
+type laya_gate >/dev/null 2>&1 || laya_gate() { return 0; }
+
 RAG=0
 VAPT_HANDOFF=0
 ARGS=()
