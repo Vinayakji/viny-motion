@@ -144,8 +144,9 @@ flowchart TD
 The pipeline runs on a **custom Android emulator driver** (`extras/viny-motion-emu.sh`) built on
 the open-source AOSP/QEMU emulator — no Genymotion software, images, or subscriptions.
 See [`docs/emulator-rooting.md`](docs/emulator-rooting.md) for rooting the Play Store image
-and Burp CA/proxy setup, and [`docs/skills-map.md`](docs/skills-map.md) for the skill
-catalog mapped to every phase.
+and Burp CA/proxy setup, [`docs/arm-apk-support.md`](docs/arm-apk-support.md) for running
+ARM-only APKs (libndk_translation) and fixing the soft keyboard, and
+[`docs/skills-map.md`](docs/skills-map.md) for the skill catalog mapped to every phase.
 
 ```bash
 ./extras/viny-motion-emu.sh start              # boot AVD headless (KVM)
@@ -153,9 +154,15 @@ catalog mapped to every phase.
 ./extras/viny-motion-emu.sh screenshot out.png # capture screen
 ./extras/viny-motion-emu.sh snap save <name>   # snapshot
 ./extras/viny-motion-emu.sh install app.apk    # install APK
-./extras/viny-motion-emu.sh proxy 127.0.0.1:8080  # route via Burp
+./extras/viny-motion-emu.sh proxy 10.0.2.2:8080   # route via Burp
 ./extras/viny-motion-emu.sh root               # adb root (userdebug image)
+./extras/viny-motion-emu.sh fix-keyboard       # reset soft keyboard if it won't open
+./extras/install-arm-apk.sh app.apk            # install an ARM-only APK (+ lib injection)
 ```
+
+For ARM-only APKs use the **Android 15 `google_apis` x86_64** image
+(`VINY_API=35`), which bundles `libndk_translation`. See
+[`docs/arm-apk-support.md`](docs/arm-apk-support.md) for the full procedure.
 
 Setup once (Android SDK cmdline-tools + emulator + Android 11 x86_64 image), then the
 pipeline's `02_setup_viny_motion` phase boots the device and every operation goes through

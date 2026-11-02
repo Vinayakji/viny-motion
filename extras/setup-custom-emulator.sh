@@ -5,6 +5,8 @@
 #   viny-motion       = google_apis        (userdebug -> root, Burp+Frida)  [default]
 #   viny-motion-play  = google_apis_playstore (Play Store, no adb root)
 # Genymotion-independent. Requires: java (JDK 17+), ~6GB disk, KVM for acceleration.
+# Set VINY_API=35 to provision Android 15, whose google_apis x86_64 image bundles
+# libndk_translation and can run ARM-only (arm64-v8a) APKs. See docs/arm-apk-support.md.
 set -uo pipefail
 
 ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"

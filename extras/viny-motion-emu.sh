@@ -16,6 +16,7 @@
 #   viny-motion-emu.sh unproxy            # clear global HTTP proxy
 #   viny-motion-emu.sh info               # device model / android version / root
 #   viny-motion-emu.sh root               # adb root (userdebug image)
+#   viny-motion-emu.sh fix-keyboard      # fix "keyboard not opening" (add --reset for Gboard floating bug)
 set -uo pipefail
 
 ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
@@ -41,6 +42,14 @@ wait_boot() {
   return 1
 }
 
+# Make the soft keyboard usable. The AVD reports a hardware keyboard, so Android
+# can suppress the IME; show_ime_with_hard_keyboard=1 forces it to render.
+keyboard_setting() {
+  a shell settings put secure show_ime_with_hard_keyboard 1 >/dev/null 2>&1
+  a shell ime enable com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME >/dev/null 2>&1
+  a shell ime set   com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME >/dev/null 2>&1
+}
+
 cmd="${1:-status}"
 shift || true
 
@@ -60,6 +69,7 @@ case "$cmd" in
       sleep 5
     done
     wait_boot
+    keyboard_setting || true
     ;;
   stop)
     a emu kill 2>/dev/null || pkill -f "$EMU.*$AVD_NAME" 2>/dev/null
@@ -105,6 +115,20 @@ case "$cmd" in
   root)
     a root && sleep 3 && echo "[viny-motion] adbd restarted as root"
     ;;
+  fix-keyboard)
+    keyboard_setting
+    if [ "${1:-}" = "--reset" ]; then
+      # Nuclear option: Gboard stuck in a floating/collapsed toolbar. Clearing
+      # its state restores the docked keyboard (shows a one-time stylus tutorial).
+      a shell pm clear com.google.android.inputmethod.latin >/dev/null 2>&1 || true
+      sleep 1
+      keyboard_setting
+      echo "[viny-motion] keyboard fully reset (Gboard state cleared)"
+    else
+      echo "[viny-motion] keyboard fix applied (show_ime_with_hard_keyboard=1, IME reselected)"
+      echo "[viny-motion] still only a floating toolbar? run: $0 fix-keyboard --reset"
+    fi
+    ;;
   info)
     echo "model:      $(a shell getprop ro.product.model 2>/dev/null | tr -d '\r')"
     echo "android:    $(a shell getprop ro.build.version.release 2>/dev/null | tr -d '\r') (SDK $(a shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r'))"
@@ -112,7 +136,7 @@ case "$cmd" in
     echo "root:       $(a shell id 2>/dev/null | head -c 60 | tr -d '\r')"
     ;;
   *)
-    echo "usage: viny-motion-emu.sh start|stop|status|adb|screenshot|snap|install|proxy|unproxy|root|info"
+    echo "usage: viny-motion-emu.sh start|stop|status|adb|screenshot|snap|install|proxy|unproxy|root|fix-keyboard|info"
     exit 1
     ;;
 esac
