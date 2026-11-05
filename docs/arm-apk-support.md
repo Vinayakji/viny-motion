@@ -108,23 +108,34 @@ Verify the emulated hardware keyboard is the cause:
 adb shell dumpsys input | grep -i "AT Translated Set 2 keyboard"
 ```
 
-## 4. Burp CA on API 35
+## 4. Burp CA on API 35 (PERMANENT, survives reboot)
 
-`/system` is read-only on API 35 even with `-writable-system`. Bind-mount a
-merged CA store instead (survives until reboot):
+On Android 14/15 the system CA store is in the **read-only Conscrypt APEX**
+(`/apex/com.android.conscrypt/cacerts`), not `/system`. Copying the CA to
+`/system` or the user store is ignored by apps. The CA must be bind-mounted over
+the APEX path *before zygote forks apps*, at every boot.
+
+The repo installs a boot-time init service that does this permanently:
 
 ```bash
-adb root
-SRC=$(adb shell readlink -f /system/etc/security/cacerts | tr -d '\r')
-adb shell "rm -rf /data/local/tmp/cacerts; mkdir -p /data/local/tmp/cacerts; cp -a $SRC/. /data/local/tmp/cacerts/"
-# burp_ca.der is the exported Burp CA (DER)
-openssl x509 -inform DER -in burp_ca.der -out /tmp/ca.pem
-H=$(openssl x509 -in /tmp/ca.pem -subject_hash_old -noout)
-cp /tmp/ca.pem /tmp/$H.0
-adb push /tmp/$H.0 /data/local/tmp/cacerts/$H.0
-adb shell "chmod 644 /data/local/tmp/cacerts/$H.0; restorecon -R /data/local/tmp/cacerts"
-adb shell "mount -o bind /data/local/tmp/cacerts /system/etc/security/cacerts"
+./extras/android-burp-setup.sh --proxy 192.168.29.19:8081 --reboot
 ```
 
-Set the proxy with `./extras/viny-motion-emu.sh proxy 10.0.2.2:8080`
-(`10.0.2.2` = host from the AOSP emulator; `10.0.3.2` is the Genymotion alias).
+What it installs:
+- `/data/misc/cacerts` — persistent merged store (APEX CAs + Burp CA), labelled
+  `u:object_r:system_security_cacerts_file:s0` (the type the cert store expects;
+  the wrong type causes `TrustedCertificateStore.shouldUseApex` NPE crashes).
+- `/system/etc/viny-ca-mount.sh` — mounts the store over the APEX CA path.
+- `/system/etc/init/viny-ca.rc` — oneshot init service (su domain) started at
+  `post-fs-data`, before zygote, so **every app inherits the CA every boot**.
+
+Verified: after reboot `ls /apex/com.android.conscrypt/cacerts/9a5ba575.0` exists,
+app process sees `/proc/<pid>/root/apex/com.android.conscrypt/cacerts/9a5ba575.0`,
+and logcat has **0** `Trust anchor` errors.
+
+Notes:
+- `-writable-system` is required; `adb disable-verity` + `adb remount` enables it.
+- Never copy the CA into `/system/etc/security/cacerts` via remount on API 35 —
+  it corrupts the writable /system overlay and breaks SystemUI on reboot.
+- Set the proxy with `./extras/viny-motion-emu.sh proxy 192.168.29.19:8081`
+  (`10.0.2.2` also works from the AOSP emulator; `192.168.29.19` is the host LAN).
